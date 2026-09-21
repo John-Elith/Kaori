@@ -1,0 +1,34 @@
+# Dependencias y compilaciones: se regeneran con npm install / npm run build.
+node_modules/
+dist/
+dist-electron/
+release/
+
+# Documentos de trabajo. Kaori se publica en cero: ningún informe, cuenta de
+# cobro, certificado, contrato ni planilla real sale de este equipo. Llevan
+# nombres, cédulas, teléfonos y cuentas bancarias de personas.
+*.docx
+*.doc
+*.pdf
+*.xlsx
+*.xls
+~$*
+
+# Pruebas que usan esos documentos reales. Funcionan en el equipo que los
+# tiene y se omiten solas en cualquier otro.
+tests/locales/
+
+# Datos del programa, por si alguien los copia a la carpeta del proyecto.
+datos.json
+datos.json.*
+modelos/
+subidas-telefono/
+
+# Varios
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

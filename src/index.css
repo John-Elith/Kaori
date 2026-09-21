@@ -1,0 +1,234 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * La paleta, en componentes RGB sueltos para que Tailwind pueda aplicarles
+   * opacidad. Modo claro aquí; modo oscuro más abajo, redefiniendo las mismas
+   * variables.
+   *
+   * El modo claro es color hueso, no blanco. Con todo en blanco puro la
+   * pantalla deslumbraba y las tarjetas no se distinguían del fondo. Ahora el
+   * fondo es hueso, las tarjetas marfil —un punto más claras, para que se
+   * despeguen— y los grises tiran a cálido, que es lo que casa con el naranja.
+   */
+  :root {
+    --fondo: 241 236 226;
+    --lienzo: 251 248 242;
+    --superficie: 235 229 217;
+    --borde: 221 212 197;
+
+    --tinta: 45 39 33;
+    --tinta-tenue: 107 97 85;
+    --tinta-suave: 158 147 132;
+
+    --naranja-50: 255 244 237;
+    --naranja-100: 255 230 213;
+    --naranja-200: 255 201 170;
+    --naranja-300: 255 162 116;
+    --naranja-400: 255 122 60;
+    --naranja-500: 242 106 33;
+    --naranja-600: 222 85 17;
+    --naranja-700: 196 80 26;
+    --naranja-800: 147 60 20;
+    --naranja-900: 122 52 19;
+
+    --apagado-fondo: 236 231 221;
+    --apagado-borde: 219 211 197;
+    --apagado-texto: 68 61 53;
+    --apagado-tenue: 117 107 94;
+
+    /* Los fondos de los avisos, algo más saturados que antes: sobre hueso,
+       los pasteles casi blancos parecían manchas en vez de colores. */
+    --info-fondo: 230 238 248;
+    --info-borde: 178 203 235;
+    --info-fuerte: 37 99 200;
+    --info-texto: 30 58 122;
+
+    --exito-fondo: 229 242 229;
+    --exito-borde: 170 214 176;
+    --exito-fuerte: 30 122 62;
+    --exito-texto: 22 80 44;
+
+    --alerta-fondo: 250 238 210;
+    --alerta-borde: 234 205 140;
+    --alerta-fuerte: 168 82 12;
+    --alerta-texto: 114 52 16;
+
+    --error-fondo: 249 229 224;
+    --error-borde: 238 186 176;
+    --error-fuerte: 196 44 36;
+    --error-texto: 122 30 26;
+
+    --barra: 208 198 181;
+    --barra-viva: 170 158 140;
+
+    --sombra-tarjeta: 0 1px 3px rgba(74, 56, 30, 0.08);
+    --sombra-elevada: 0 4px 14px rgba(74, 56, 30, 0.12);
+
+    color-scheme: light;
+  }
+
+  /*
+   * Modo oscuro. No es el claro con los grises invertidos: los fondos llevan
+   * una pizca de azul cálido para que el naranja de marca no chille sobre
+   * ellos, y el contorno se aclara en vez de oscurecerse, porque sobre fondo
+   * oscuro un borde más oscuro desaparece.
+   */
+  .oscuro {
+    --fondo: 21 24 28;
+    --lienzo: 27 31 36;
+    --superficie: 32 37 43;
+    --borde: 46 52 60;
+
+    --tinta: 232 234 237;
+    --tinta-tenue: 155 163 174;
+    --tinta-suave: 113 121 132;
+
+    --naranja-50: 58 35 23;
+    --naranja-100: 74 44 27;
+    --naranja-200: 107 62 34;
+    --naranja-300: 255 178 138;
+    --naranja-400: 255 150 100;
+    --naranja-500: 242 106 33;
+    --naranja-600: 255 130 62;
+    --naranja-700: 255 165 118;
+    --naranja-800: 255 200 170;
+    --naranja-900: 255 224 205;
+
+    --apagado-fondo: 38 43 50;
+    --apagado-borde: 55 62 71;
+    --apagado-texto: 200 206 214;
+    --apagado-tenue: 140 148 158;
+
+    --info-fondo: 23 37 58;
+    --info-borde: 38 63 94;
+    --info-fuerte: 125 178 255;
+    --info-texto: 199 222 255;
+
+    --exito-fondo: 20 44 32;
+    --exito-borde: 30 74 51;
+    --exito-fuerte: 74 200 130;
+    --exito-texto: 190 235 208;
+
+    --alerta-fondo: 54 41 16;
+    --alerta-borde: 88 65 22;
+    --alerta-fuerte: 240 180 70;
+    --alerta-texto: 248 224 170;
+
+    --error-fondo: 56 26 26;
+    --error-borde: 92 40 40;
+    --error-fuerte: 248 120 120;
+    --error-texto: 252 200 200;
+
+    --barra: 62 69 79;
+    --barra-viva: 85 94 106;
+
+    /* Sombras más profundas: sobre oscuro, una sombra suave no se ve. */
+    --sombra-tarjeta: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --sombra-elevada: 0 4px 14px rgba(0, 0, 0, 0.5);
+
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-fondo text-tinta antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  /* La selección con el naranja de marca, suave para no molestar. */
+  ::selection {
+    @apply bg-naranja-100 text-naranja-900;
+  }
+
+  /* Foco visible siempre: la aplicación debe poder usarse con el teclado. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-naranja-500 ring-offset-2 ring-offset-fondo;
+  }
+
+  /* Barras de desplazamiento discretas. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-barra;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-barra-viva;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /*
+   * La transición del cambio de tema.
+   *
+   * Va en una clase temporal, no permanente: si todos los elementos animasen
+   * siempre su color de fondo, cada paso del ratón por encima de un botón
+   * arrastraría un cuarto de segundo y la interfaz se sentiría pastosa. Al
+   * pulsar el interruptor se pone esta clase, se cambia el tema y se quita
+   * cuando termina la animación.
+   */
+  .cambiando-tema,
+  .cambiando-tema *,
+  .cambiando-tema *::before,
+  .cambiando-tema *::after {
+    transition:
+      background-color 280ms ease,
+      border-color 280ms ease,
+      color 280ms ease,
+      fill 280ms ease,
+      stroke 280ms ease,
+      box-shadow 280ms ease !important;
+    transition-delay: 0ms !important;
+  }
+
+  /* Quien pidió menos animación en Windows no debe sufrir la transición. */
+  @media (prefers-reduced-motion: reduce) {
+    .cambiando-tema,
+    .cambiando-tema *,
+    .cambiando-tema *::before,
+    .cambiando-tema *::after {
+      transition: none !important;
+    }
+  }
+}
+
+@layer components {
+  .tarjeta {
+    @apply rounded-xl border border-borde bg-lienzo shadow-tarjeta;
+  }
+
+  .campo {
+    @apply w-full rounded-lg border border-borde bg-lienzo px-3 py-2 text-sm
+           text-tinta placeholder:text-tinta-suave focus:border-naranja-400;
+  }
+
+  /* Lo que sólo tiene sentido delante del PC —elegir o abrir carpetas— no se
+     ofrece desde el teléfono. */
+  .remoto .solo-pc {
+    display: none !important;
+  }
+
+  /* Hueco a la derecha para el micrófono, que el texto no pase por debajo. */
+  .dictable > .campo {
+    @apply pr-10;
+  }
+
+  .etiqueta {
+    @apply mb-1.5 block text-sm font-medium text-tinta;
+  }
+
+  /* Las tablas anchas se desplazan dentro de su caja; la página nunca. */
+  .tabla-desplazable {
+    @apply w-full overflow-x-auto;
+  }
+}
