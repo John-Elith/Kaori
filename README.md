@@ -5,20 +5,20 @@
 <h1 align="center">Kaori</h1>
 
 <p align="center">
-  Genera en Word los informes mensuales de contratos de prestación de servicios de una alcaldía,<br>
+  Genera en Word los informes mensuales de contratos de prestación de servicios,<br>
   conservando exactamente el diseño de sus propias plantillas.
 </p>
 
 ---
 
-Cada mes, cada contratista de una alcaldía entrega un informe de actividades,
+Cada mes, quien trabaja por prestación de servicios entrega un informe de actividades,
 una cuenta de cobro y, al terminar, un certificado de cumplimiento. Casi todo
 lo que llevan está ya en el contrato: fechas, valores, obligaciones, CDP y RP.
 Kaori lo registra una vez y produce los documentos de cualquier mes: calcula
 los pagos, los acumulados y los saldos, y escribe las fechas y las cifras en
 letras.
 
-No dibuja los documentos de nuevo. Parte del Word que ya usa la entidad, así
+No dibuja los documentos de nuevo. Parte del Word que ya usa su organización, así
 que el resultado sale con su logo, sus tablas y su formato, sin cambiar nada.
 
 ## Qué hace
@@ -31,22 +31,22 @@ que el resultado sale con su logo, sus tablas y su formato, sin cambiar nada.
 - **Cálculos automáticos**: cronograma de pagos, meses incompletos en
   proporción, relación de pagos acumulada, balance del contrato, adiciones y
   suspensiones.
-- **Español correcto**: importes y fechas en letras como los escribe la
-  administración («UN MILLÓN SEISCIENTOS VEINTITRÉS MIL PESOS M/CTE»).
+- **Español correcto**: importes y fechas en letras con la redacción formal de
+  los documentos contractuales («UN MILLÓN SEISCIENTOS VEINTITRÉS MIL PESOS M/CTE»).
 - **Lectura de contratos**: propone los datos a partir del PDF del contrato o
   de la planilla PILA, también de escaneos.
 - **Redacción con IA (opcional)**: con una clave de Claude o de Gemini, redacta
-  las obligaciones y las actividades ejecutadas en el estilo de la entidad.
+  las obligaciones y las actividades ejecutadas en el estilo de su organización.
 - **Dictado por voz**: en los campos de texto, en el propio equipo y sin enviar
   la voz a ningún servicio.
-- **Desde el teléfono**: la misma interfaz, por la Wi-Fi de la oficina, con un
+- **Desde el teléfono**: la misma interfaz, por la misma red Wi-Fi, con un
   código QR y un código de acceso que se ve en el PC.
 - **Contrato nuevo a partir de otro**: copia el objeto, las obligaciones y el
   sueldo del contrato anterior de la misma persona.
 
 ## Privacidad
 
-Kaori **empieza vacío**: no trae datos de ningún municipio ni de ninguna
+Kaori **empieza vacío**: no trae datos de ninguna organización ni de ninguna
 persona. Los contratos, los contratistas y las plantillas se guardan en el
 equipo donde se usa, en un archivo que no forma parte de este repositorio.
 Las claves de IA se guardan cifradas por Windows.
@@ -68,8 +68,8 @@ El instalador no está firmado digitalmente. La primera vez, Windows muestra
 
 ## Primeros pasos
 
-1. **Ajustes**: elija la carpeta de salida y escriba los datos de la entidad
-   (contratante, NIT, municipio, supervisor).
+1. **Ajustes**: elija la carpeta de salida y escriba los datos de su organización
+   (contratante, NIT, ciudad y supervisor).
 2. **Plantillas**: suba un informe, una cuenta de cobro o un certificado de
    Word ya diligenciado y confirme los campos que reconoce.
 3. **Contratistas y Contratos**: registre a las personas y sus contratos, a
