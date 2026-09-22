@@ -2129,8 +2129,8 @@ function CargarDeOtroContrato({
   const vacio = contrato.objeto.trim() === '' && contrato.obligaciones.length === 0;
   const [abierto, setAbierto] = useState(vacio);
   const [elegido, setElegido] = useState(ordenados[0]?.id ?? '');
-  /** Lo cargado: de qué contrato, y si el sueldo pudo repartirse. */
-  const [hecho, setHecho] = useState<{ numero: string; repartido: boolean; mensual: number } | null>(
+  /** Lo cargado: de qué contrato, con qué sueldo tenía y si el plazo se pudo redactar. */
+  const [hecho, setHecho] = useState<{ numero: string; redactado: boolean; mensual: number } | null>(
     null,
   );
 
@@ -2142,21 +2142,23 @@ function CargarDeOtroContrato({
 
   if (hecho) {
     return (
-      hecho.repartido ? (
+      hecho.redactado ? (
         <Aviso tipo="exito" titulo={`Datos cargados del contrato ${hecho.numero}`}>
-          Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, los
-          datos de pago y las plantillas. El sueldo se repartió en cuotas con las fechas de
-          este contrato, y el plazo y la forma de pago se redactaron de nuevo con ellas.
-          Revise la pestaña Pagos si el primer o el último mes no se pagan completos de otra
-          forma. El número, las fechas, el CDP y el RP siguen siendo los de este contrato.
+          Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, el
+          contratante, el teléfono, la cuenta y las plantillas, y el plazo se redactó de
+          nuevo con las fechas de este contrato. El dinero no se copia: escriba en Pagos el
+          valor del contrato y genere su cronograma
+          {hecho.mensual > 0 ? `; el otro contrato iba a ${moneda(hecho.mensual)} al mes` : ''}.
+          El número, las fechas, el CDP y el RP siguen siendo los de este contrato.
         </Aviso>
       ) : (
-        <Aviso tipo="alerta" titulo={`Datos cargados del contrato ${hecho.numero}, salvo el sueldo`}>
-          Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, los
-          datos de pago y las plantillas. El sueldo no se pudo repartir en cuotas porque
-          las fechas de este contrato están al revés (el inicio va después de la
-          terminación). Corríjalas en Datos y después, en Pagos, genere el cronograma
-          {hecho.mensual > 0 ? ` con ${moneda(hecho.mensual)} al mes, que era el sueldo del otro contrato` : ''}.
+        <Aviso tipo="alerta" titulo={`Datos cargados del contrato ${hecho.numero}, salvo el plazo`}>
+          Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, el
+          contratante, el teléfono, la cuenta y las plantillas. El plazo no se pudo redactar
+          porque las fechas de este contrato están al revés (el inicio va después de la
+          terminación): corríjalas en Datos. El dinero no se copia: escriba en Pagos el
+          valor del contrato y genere su cronograma
+          {hecho.mensual > 0 ? `; el otro contrato iba a ${moneda(hecho.mensual)} al mes` : ''}.
         </Aviso>
       )
     );
@@ -2187,14 +2189,14 @@ function CargarDeOtroContrato({
       </div>
 
       <p className="mt-1">
-        <b>Se copian</b>: objeto, obligaciones y actividades, sueldo, plazo, forma de pago,
-        supervisor, contratante, teléfono, cuenta y plantillas.{' '}
-        <b>No se copian</b>: número, fechas de inicio, terminación y firma, CDP y RP.
+        <b>Se copian</b>: objeto, obligaciones y actividades, plazo, supervisor, contratante,
+        teléfono, cuenta y plantillas.{' '}
+        <b>No se copian</b>: número, fechas de inicio, terminación y firma, CDP y RP, ni el
+        valor del contrato, sus cuotas y la forma de pago, que se escriben en Pagos.
       </p>
       <p className="mt-1 text-xs opacity-90">
-        Ponga antes las fechas de este contrato: el sueldo se reparte en cuotas con ellas, y
-        el plazo y la forma de pago se redactan de nuevo para que no digan las fechas del
-        otro contrato.
+        Ponga antes las fechas de este contrato: el plazo se redacta de nuevo con ellas para
+        que no diga las del otro contrato.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -2218,7 +2220,7 @@ function CargarDeOtroContrato({
             if (
               !vacio &&
               !window.confirm(
-                `Se reemplazarán el objeto, las obligaciones, el sueldo y los demás datos de este contrato por los del ${anterior.numero || 'contrato elegido'}. ¿Continuar?`,
+                `Se reemplazarán el objeto, las obligaciones y los demás datos de este contrato por los del ${anterior.numero || 'contrato elegido'}. El valor y las cuotas no se tocan. ¿Continuar?`,
               )
             ) {
               return;
@@ -2226,7 +2228,7 @@ function CargarDeOtroContrato({
             alCargar(anterior);
             setHecho({
               numero: anterior.numero || describir(anterior),
-              repartido: fechasCoherentes(contrato) || mensualidadHabitual(anterior.cuotas) === 0,
+              redactado: fechasCoherentes(contrato),
               mensual: mensualidadHabitual(anterior.cuotas),
             });
           }}

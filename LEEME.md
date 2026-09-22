@@ -320,18 +320,23 @@ datos?»**. Se elige de cuál (si hay varios) y se pulsa **Cargar sus datos**.
 
 | Se copia tal cual | Se recalcula con las fechas del nuevo | No se copia |
 |---|---|---|
-| Objeto | Sueldo: las cuotas | Número |
-| Obligaciones y actividades | Valor del contrato | Fechas de inicio, terminación y firma |
-| Supervisor y contratante | Texto del plazo | CDP y RP con sus valores |
-| Teléfono y cuenta | Forma de pago | Adiciones y suspensiones |
-| Las tres plantillas | | |
+| Objeto | Texto del plazo | Número |
+| Obligaciones y actividades | | Fechas de inicio, terminación y firma |
+| Supervisor y contratante | | CDP y RP con sus valores |
+| Teléfono y cuenta | | Adiciones y suspensiones |
+| Las tres plantillas | | Valor del contrato, cuotas y forma de pago |
 
-Conviene poner antes las fechas del contrato nuevo. El sueldo es la cuota que
-más se repite en el anterior, y se reparte entre las fechas nuevas. Si el
-contrato empieza o termina a mitad de mes, ese mes se paga en proporción,
-sobre un mes de 30 días: del 15 de enero, 1.623.000 × 16/30 = 865.600. El plazo
-y la forma de pago se redactan de nuevo. Copiados tal cual dirían las fechas y
-las cifras del contrato anterior, en un documento que se firma.
+Conviene poner antes las fechas del contrato nuevo: el plazo se redacta con
+ellas, porque copiado tal cual diría las del contrato anterior en un documento
+que se firma.
+
+**El dinero no se copia.** El valor del contrato y sus cuotas quedan vacíos,
+aunque el anterior los tuviera: el sueldo cambia de un contrato al siguiente
+más de lo que parece, y una cifra heredada sin querer acaba impresa en un
+documento que se firma. Se escribe el valor en **Pagos** y se genera allí el
+cronograma; el aviso de la carga recuerda a cuánto iba el contrato anterior.
+Sin cuotas no hay forma de pago que redactar, así que también queda vacía:
+se redacta con su botón cuando estén hechas las cuotas.
 
 En un contrato que ya tiene datos, el recuadro queda como un botón («Cargar
 datos de otro contrato de esta persona») y pide confirmación, porque

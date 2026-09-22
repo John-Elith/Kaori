@@ -9,27 +9,29 @@
  * inicio, terminación y firma, el CDP y el RP con sus valores, ni las adiciones
  * y suspensiones, que fueron novedades del contrato anterior.
  *
+ * Tampoco el dinero: el valor del contrato y sus cuotas quedan vacíos. El
+ * sueldo cambia de un contrato al siguiente más de lo que parece —y una cifra
+ * heredada sin querer va a parar a un documento que se firma—, así que se
+ * escribe a mano en Pagos y de ahí sale el cronograma. Sin cuotas no hay
+ * forma de pago que redactar, y también queda vacía.
+ *
  * **Se copia tal cual**: el objeto, las obligaciones con sus actividades, las
  * de supervisión, el supervisor, el contratante, el municipio, el teléfono, la
  * cuenta y las tres plantillas.
  *
- * **Se recalcula con las fechas del contrato nuevo**:
+ * **Se recalcula con las fechas del contrato nuevo** el texto del plazo:
+ * copiado tal cual diría las fechas del contrato anterior, así que se redacta
+ * de nuevo, igual que con el botón de «Redactar».
  *
- * - El sueldo. Se toma la mensualidad del anterior —la cuota que más se
- *   repite— y se reparte en cuotas entre las fechas nuevas. Un mes empezado o
- *   terminado a medias se paga en proporción, sobre un mes comercial de 30
- *   días: así lo hacen los contratos del municipio (el 084-2025 empezó el 7 de
- *   enero y cobró 1.623.000 × 24/30 = 1.298.400).
- * - El texto del plazo y la forma de pago. Copiados tal cual dirían las fechas
- *   y las cifras del contrato anterior, en un documento que se firma; se
- *   redactan de nuevo, igual que con los botones de «Redactar».
+ * `mensualidadHabitual` y `cuotasProrrateadas` siguen aquí: reparten un sueldo
+ * entre dos fechas, con los meses a medias en proporción sobre un mes
+ * comercial de 30 días, que es como se pagan estos contratos.
  */
 
 import type { Contrato, Cuota } from './tipos';
 import { desdeISO, ultimoDiaDelMes } from '../espanol/calendario';
 import { frasePlazo } from '../espanol/fechaEnLetras';
 import { generarCronograma } from '../pagos/cronograma';
-import { redactarFormaDePago } from '../generar/formaDePago';
 
 /** La mensualidad de un contrato: la cuota que más se repite. */
 export function mensualidadHabitual(cuotas: Cuota[]): number {
@@ -92,19 +94,9 @@ export function fechasCoherentes(c: Pick<Contrato, 'fechaInicio' | 'fechaTermina
 }
 
 export function heredarDeContrato(nuevo: Contrato, anterior: Contrato): Contrato {
-  const mensual = mensualidadHabitual(anterior.cuotas);
-  // Con las fechas al revés —un año mal escrito— no hay entre qué fechas
-  // repartir el sueldo ni plazo que redactar. Se copia todo lo demás y eso se
-  // deja para cuando se corrijan; antes, esto fallaba y el sueldo se perdía.
+  // Con las fechas al revés —un año mal escrito— no hay plazo que redactar. Se
+  // copia todo lo demás y eso se deja para cuando se corrijan.
   const coherentes = fechasCoherentes(nuevo);
-
-  // Sin cuotas en el anterior no hay sueldo que repartir: se deja lo que haya.
-  const cuotas =
-    mensual > 0 && coherentes
-      ? cuotasProrrateadas(nuevo.fechaInicio, nuevo.fechaTerminacion, mensual)
-      : nuevo.cuotas;
-  const valorInicial =
-    mensual > 0 && coherentes ? cuotas.reduce((s, c) => s + c.valor, 0) : nuevo.valorInicial;
 
   let textoPlazo = '';
   if (anterior.textoPlazo.trim() && coherentes) {
@@ -115,18 +107,10 @@ export function heredarDeContrato(nuevo: Contrato, anterior: Contrato): Contrato
       : frase.charAt(0) + frase.slice(1).toLocaleLowerCase('es');
   }
 
-  const formaDePago =
-    anterior.formaDePago.trim() && cuotas.length > 0
-      ? redactarFormaDePago({ valorTotal: valorInicial, cuotas, fechaInicio: nuevo.fechaInicio })
-      : '';
-
   return {
     ...nuevo,
     objeto: anterior.objeto,
     textoPlazo,
-    formaDePago,
-    valorInicial,
-    cuotas,
     contratante: anterior.contratante,
     nitContratante: anterior.nitContratante,
     municipio: anterior.municipio,

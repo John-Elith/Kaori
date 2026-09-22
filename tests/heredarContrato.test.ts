@@ -124,15 +124,21 @@ describe('lo que se copia y lo que no', () => {
   });
 });
 
-describe('el sueldo, repartido con las fechas nuevas', () => {
+describe('el sueldo y su reparto', () => {
   it('la mensualidad es la cuota que más se repite, no la primera', () => {
     expect(mensualidadHabitual(anterior.cuotas)).toBe(1_623_000);
   });
 
-  it('de julio a diciembre, seis meses completos', () => {
+  it('el dinero no se hereda: el contrato nuevo queda sin valor ni cuotas', () => {
     const r = heredarDeContrato(nuevo(), anterior);
-    expect(r.cuotas.map((c) => c.valor)).toEqual(Array(6).fill(1_623_000));
-    expect(r.valorInicial).toBe(9_738_000);
+    expect(r.cuotas).toEqual([]);
+    expect(r.valorInicial).toBe(0);
+  });
+
+  it('repartido a mano, de julio a diciembre son seis meses completos', () => {
+    const c = cuotasProrrateadas('2025-07-01', '2025-12-31', 1_623_000);
+    expect(c.map((x) => x.valor)).toEqual(Array(6).fill(1_623_000));
+    expect(c.reduce((s, x) => s + x.valor, 0)).toBe(9_738_000);
   });
 
   it('empezando a mitad de mes, el primero en proporción sobre 30 días', () => {
@@ -153,8 +159,8 @@ describe('el sueldo, repartido con las fechas nuevas', () => {
     expect(c).toEqual([{ n: 1, fecha: '2025-08-25', valor: 811_500 }]);
   });
 
-  it('si el anterior no tenía cronograma, no se inventa ninguno', () => {
-    const r = heredarDeContrato(nuevo({ valorInicial: 5_000_000 }), { ...anterior, cuotas: [] });
+  it('lo que ya hubiera escrito en el contrato nuevo se respeta', () => {
+    const r = heredarDeContrato(nuevo({ valorInicial: 5_000_000 }), anterior);
     expect(r.cuotas).toEqual([]);
     expect(r.valorInicial).toBe(5_000_000);
   });
@@ -187,7 +193,7 @@ describe('con las fechas al revés', () => {
   });
 });
 
-describe('el plazo y la forma de pago, con las fechas nuevas', () => {
+describe('el plazo, con las fechas nuevas', () => {
   const r = heredarDeContrato(nuevo(), anterior);
 
   it('el plazo dice las fechas del contrato nuevo, no las del anterior', () => {
@@ -202,9 +208,8 @@ describe('el plazo y la forma de pago, con las fechas nuevas', () => {
     expect(r2.textoPlazo.startsWith('Desde el día primero (01) de julio')).toBe(true);
   });
 
-  it('la forma de pago cuenta el valor y las cuotas nuevas', () => {
-    expect(r.formaDePago).toContain('NUEVE MILLONES SETECIENTOS TREINTA Y OCHO MIL');
-    expect(r.formaDePago).not.toContain('enero');
+  it('la forma de pago no se copia: hablaría de un dinero que no se heredó', () => {
+    expect(r.formaDePago).toBe('');
   });
 
   it('si el anterior no tenía plazo ni forma de pago escritos, quedan vacíos', () => {
