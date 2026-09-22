@@ -116,6 +116,19 @@ Al elegir un mes anterior se mueven las tres cosas a la vez:
 
 La fila lo marca con la insignia **parcial**.
 
+#### El apartado se pliega y se filtra
+
+La lista empieza por el **último contrato trabajado**, marcado con su insignia,
+y sigue con los demás del más reciente al más antiguo. En la cabecera hay un
+selector **Contrato** con ese mismo orden: al elegir uno, la lista muestra sólo
+su certificado, y «Generar» cuenta sólo lo que se ve. **Quitar filtro** vuelve
+a mostrarlos todos.
+
+El título, con su flecha, pliega y despliega el apartado entero, igual que los
+meses de la tabla de arriba. Plegado ocupa un renglón y dice por cuál está
+filtrado o cuál fue el último contrato trabajado. Tanto el filtro como el
+plegado se recuerdan al volver a la pantalla.
+
 ## Dónde quedan los archivos
 
 Cada mes tiene su carpeta dentro de la carpeta de salida, y el informe y su
