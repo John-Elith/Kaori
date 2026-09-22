@@ -1,9 +1,11 @@
+import { app } from 'electron';
 import { manejar } from '../canales';
 import { promises as fs } from 'node:fs';
-import { extname } from 'node:path';
+import { extname, join } from 'node:path';
 
 import { extraerCamposContrato, extraerPlanilla } from '../../core/extraccion/camposContrato';
 import { completarActividades } from '../../core/extraccion/redactarActividades';
+import { extraerObligacionesNumeradas } from '../../core/extraccion/obligacionesNumeradas';
 import {
   extraerContratoConIA,
   extraerPlanillaConIA,
@@ -11,6 +13,7 @@ import {
 } from '../../core/extraccion/extraerIA';
 import {
   NOMBRE_PROVEEDOR,
+  leerObligaciones,
   proponerObligaciones,
   redactarActividades,
   type RedactorIA,
@@ -52,16 +55,99 @@ async function textoDePdf(ruta: string): Promise<string> {
   return paginas.join('\n\n');
 }
 
-/** OCR sin conexión. Se carga bajo demanda porque es pesado. */
-async function ocrLocal(ruta: string): Promise<string> {
-  const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker('spa');
+/**
+ * La imagen preparada para el OCR: ampliada, en gris, con el contraste
+ * estirado y enfocada.
+ *
+ * Una foto de un contrato hecha con el teléfono sale a unos 180 ppp y con
+ * sombras; así, Tesseract mezclaba líneas y la leía con un 75 % de confianza.
+ * Preparada, la misma foto sube al 88 % y las líneas salen en orden.
+ */
+async function prepararImagen(ruta: string, ancho = 2400): Promise<Buffer | string> {
   try {
-    const { data } = await worker.recognize(ruta);
+    // Según cómo se cargue, sharp llega como la función o dentro de `default`.
+    const modulo = await import('sharp');
+    type Sharp = typeof modulo.default;
+    const sharp: Sharp =
+      (modulo as unknown as { default?: Sharp }).default ?? (modulo as unknown as Sharp);
+    return await sharp(ruta)
+      .resize({ width: ancho })
+      .grayscale()
+      .normalize()
+      .sharpen()
+      .png()
+      .toBuffer();
+  } catch {
+    // Sin sharp, o con un formato que no entiende: se lee tal cual.
+    return ruta;
+  }
+}
+
+/**
+ * OCR sin conexión. Se carga bajo demanda porque es pesado.
+ *
+ * `bloque` lee la página como un solo bloque de texto, que es lo que es la
+ * cláusula de un contrato; evita que Tesseract crea ver columnas.
+ */
+async function ocrLocal(ruta: string, bloque = false): Promise<string> {
+  const { createWorker } = await import('tesseract.js');
+  // El diccionario de español se descarga la primera vez y se guarda con los
+  // datos del programa. Por defecto iría a la carpeta desde la que se abre
+  // Kaori, que en el programa instalado es Archivos de programa: sin permiso
+  // para escribir.
+  const cachePath = join(app.getPath('userData'), 'ocr');
+  await fs.mkdir(cachePath, { recursive: true });
+  const worker = await createWorker('spa', undefined, { cachePath });
+  try {
+    if (bloque) {
+      await worker.setParameters({ tessedit_pageseg_mode: '6' as never, user_defined_dpi: '300' });
+    }
+    const entrada = tipoImagen(extname(ruta)) ? await prepararImagen(ruta) : ruta;
+    const { data } = await worker.recognize(entrada);
     return data.text;
   } finally {
     await worker.terminate();
   }
+}
+
+/**
+ * Las obligaciones de una foto, leídas sin IA.
+ *
+ * El OCR es muy sensible a la escala y al modo de página: con la misma foto,
+ * ampliada a 2000 px y leída como un bloque salían las 15 obligaciones; a
+ * 3000 px y en el mismo modo, una. No hay un ajuste que sirva siempre, así que
+ * se prueban hasta tres y se queda la lectura que encuentra más. Si la primera
+ * ya sale clara, no se prueban las demás.
+ */
+async function ocrObligaciones(ruta: string): Promise<string[]> {
+  const { createWorker } = await import('tesseract.js');
+  const cachePath = join(app.getPath('userData'), 'ocr');
+  await fs.mkdir(cachePath, { recursive: true });
+  const worker = await createWorker('spa', undefined, { cachePath });
+  const intentos: [number, string][] = [
+    [2000, '6'], // un solo bloque de texto
+    [2500, '4'], // una columna
+    [3000, '3'], // automático
+  ];
+  let mejor: { obligaciones: string[]; confianza: number } = { obligaciones: [], confianza: 0 };
+  try {
+    for (const [ancho, psm] of intentos) {
+      const imagen = await prepararImagen(ruta, ancho);
+      await worker.setParameters({ tessedit_pageseg_mode: psm as never, user_defined_dpi: '300' });
+      const { data } = await worker.recognize(imagen);
+      const obligaciones = extraerObligacionesNumeradas(data.text);
+      if (
+        obligaciones.length > mejor.obligaciones.length ||
+        (obligaciones.length === mejor.obligaciones.length && data.confidence > mejor.confianza)
+      ) {
+        mejor = { obligaciones, confianza: data.confidence };
+      }
+      if (obligaciones.length >= 3 && data.confidence >= 86) break;
+    }
+  } finally {
+    await worker.terminate();
+  }
+  return mejor.obligaciones;
 }
 
 export type TextoExtraido = {
@@ -182,7 +268,12 @@ export function registrarCanalesExtraccion(
       }
 
       const redactor = await obtenerRedactor();
+      // Con una IA configurada, si falla no se escribe por reglas a escondidas:
+      // se devuelve el motivo y la persona decide si reintenta o usa las reglas.
+      // Antes se callaba, y el resultado parecía de la IA sin serlo.
+      let aviso: string | undefined;
       if (redactor) {
+        const nombre = NOMBRE_PROVEEDOR[redactor.proveedor];
         try {
           const redactadas = await redactarActividades(
             redactor,
@@ -197,19 +288,90 @@ export function registrarCanalesExtraccion(
               : (redactadas[i++] ?? ''),
           );
           if (actividades.every((a) => a.length > 0)) {
-            return { actividades, motor: 'ia' as const };
+            return { actividades, motor: 'ia' as const, proveedor: nombre };
           }
-        } catch {
-          // Si la IA falla, se sigue con las reglas: nunca se deja al usuario sin salida.
+          aviso =
+            `${nombre} devolvió ${redactadas.length} actividad(es) para ${faltantes.length} ` +
+            'obligación(es). Vuelva a intentarlo.';
+        } catch (e) {
+          aviso = `No se pudo redactar con ${nombre}. ${e instanceof Error ? e.message : String(e)}`;
         }
+        return {
+          actividades: obligaciones.map((o) => o.actividad ?? ''),
+          motor: 'fallo' as const,
+          proveedor: nombre,
+          error: aviso,
+        };
       }
 
+      // Sin ninguna IA configurada, las reglas son el camino previsto.
       return {
         actividades: completarActividades(obligaciones, impersonal),
         motor: 'reglas' as const,
       };
     },
   );
+
+  /**
+   * Lee las obligaciones específicas de la imagen o el PDF de un contrato.
+   *
+   * Con IA, se le manda el documento y las transcribe: con una foto de
+   * teléfono es lo único que sale limpio. Sin IA —o si falla— se lee el texto
+   * (el del PDF o el del OCR) y se busca la lista numerada hasta el
+   * «Parágrafo». Lo que salga se revisa: un escaneo puede confundir letras.
+   */
+  manejar('extraccion:obligaciones', async (_e, ruta: string) => {
+    const ext = extname(ruta).toLowerCase();
+    if (ext !== '.pdf' && !tipoImagen(ext)) {
+      return {
+        ok: false as const,
+        error: `No se puede leer un archivo ${ext || 'sin extensión'}. Use una foto (JPG, PNG) o un PDF.`,
+      };
+    }
+
+    let aviso: string | undefined;
+    const redactor = await obtenerRedactor();
+    if (redactor) {
+      const nombre = NOMBRE_PROVEEDOR[redactor.proveedor];
+      try {
+        const obligaciones = await leerObligaciones(redactor, await fs.readFile(ruta), ext);
+        if (obligaciones.length > 0) {
+          return { ok: true as const, obligaciones, motor: 'ia' as const, proveedor: nombre };
+        }
+        aviso = `${nombre} no encontró una lista numerada de obligaciones.`;
+      } catch (e) {
+        aviso = `No se pudo leer con ${nombre} (${e instanceof Error ? e.message : String(e)}).`;
+      }
+    }
+
+    // Sin IA, o si falló: el texto del documento y la lista numerada.
+    let texto: string;
+    try {
+      texto = ext === '.pdf' ? (await leerTexto(ruta)).texto : '';
+    } catch (e) {
+      return {
+        ok: false as const,
+        error: `${aviso ? aviso + ' ' : ''}No se pudo leer el documento: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    const obligaciones = ext === '.pdf' ? extraerObligacionesNumeradas(texto) : await ocrObligaciones(ruta);
+    if (obligaciones.length === 0) {
+      return {
+        ok: false as const,
+        error:
+          `${aviso ? aviso + ' ' : ''}No se encontró la lista numerada de obligaciones (1., 2., 3.…). ` +
+          'Compruebe que la foto se vea nítida y derecha, o pegue el texto en el cuadro de abajo.',
+      };
+    }
+    return {
+      ok: true as const,
+      obligaciones,
+      motor: 'ocr' as const,
+      aviso:
+        (aviso ? `${aviso} ` : '') +
+        'Se leyeron sin IA, con reconocimiento de texto: revíselas, porque el escaneo puede confundir letras.',
+    };
+  });
 
   /**
    * Propone las obligaciones específicas a partir de una indicación.

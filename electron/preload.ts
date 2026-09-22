@@ -336,10 +336,31 @@ const api = {
       ipcRenderer.invoke('extraccion:proponerObligaciones', indicacion, cuantas, objeto),
 
     /** Redacta las ACTIVIDADES EJECUTADAS que falten. */
+    /**
+     * Lee las obligaciones específicas de la foto o el PDF de un contrato: la
+     * lista numerada hasta el «Parágrafo». `motor` dice si las leyó la IA o
+     * el reconocimiento de texto sin conexión.
+     */
+    obligaciones: (
+      ruta: string,
+    ): Promise<
+      | { ok: true; obligaciones: string[]; motor: 'ia' | 'ocr'; proveedor?: string; aviso?: string }
+      | { ok: false; error: string }
+    > => ipcRenderer.invoke('extraccion:obligaciones', ruta),
+
+    /**
+     * `motor: 'fallo'` significa que la IA configurada no respondió: las
+     * actividades vuelven sin tocar y `error` dice por qué.
+     */
     redactarActividades: (
       obligaciones: { n: number; texto: string; actividad?: string }[],
       enTercerapersona: boolean,
-    ): Promise<{ actividades: string[]; motor: 'ia' | 'reglas' }> =>
+    ): Promise<{
+      actividades: string[];
+      motor: 'ia' | 'reglas' | 'fallo';
+      proveedor?: string;
+      error?: string;
+    }> =>
       ipcRenderer.invoke('extraccion:redactar', obligaciones, enTercerapersona),
   },
 } as const;

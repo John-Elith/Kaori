@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   cuotasProrrateadas,
+  fechasCoherentes,
   heredarDeContrato,
   mensualidadHabitual,
 } from '../core/modelo/heredarContrato';
@@ -156,6 +157,33 @@ describe('el sueldo, repartido con las fechas nuevas', () => {
     const r = heredarDeContrato(nuevo({ valorInicial: 5_000_000 }), { ...anterior, cuotas: [] });
     expect(r.cuotas).toEqual([]);
     expect(r.valorInicial).toBe(5_000_000);
+  });
+});
+
+describe('con las fechas al revés', () => {
+  // Pasó de verdad: inicio 01/07/2026 y terminación 30/12/2025, por un año mal
+  // escrito. Antes la carga fallaba a medias y el cronograma no se generaba.
+  const alReves = nuevo({ fechaInicio: '2026-07-01', fechaTerminacion: '2025-12-30' });
+
+  it('no falla: copia todo lo demás', () => {
+    const r = heredarDeContrato(alReves, anterior);
+    expect(r.objeto).toBe(anterior.objeto);
+    expect(r.obligaciones).toEqual(anterior.obligaciones);
+    expect(r.plantillaId).toBe('pl-informe');
+  });
+
+  it('no inventa un sueldo ni un plazo entre fechas imposibles', () => {
+    const r = heredarDeContrato(alReves, anterior);
+    expect(r.cuotas).toEqual([]);
+    expect(r.valorInicial).toBe(0);
+    expect(r.textoPlazo).toBe('');
+    expect(r.formaDePago).toBe('');
+  });
+
+  it('se reconocen como incoherentes', () => {
+    expect(fechasCoherentes(alReves)).toBe(false);
+    expect(fechasCoherentes(nuevo())).toBe(true);
+    expect(fechasCoherentes(nuevo({ fechaInicio: '2025-07-01', fechaTerminacion: '2025-07-01' }))).toBe(true);
   });
 });
 

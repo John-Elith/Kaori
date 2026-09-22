@@ -30,11 +30,15 @@ export default defineConfig({
               // El reconocimiento de voz carga binarios nativos (.node, .dll)
               // que no se pueden meter en un paquete de JavaScript: se dejan
               // fuera y se cargan de node_modules al usarse.
+              // Tesseract (el OCR sin conexión) lanza un proceso auxiliar con un
+              // archivo propio: empaquetado, no lo encontraba y la lectura se
+              // quedaba esperando para siempre.
               external: [
                 '@huggingface/transformers',
                 'onnxruntime-node',
                 'onnxruntime-web',
                 'sharp',
+                'tesseract.js',
               ],
             },
           },

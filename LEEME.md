@@ -234,6 +234,15 @@ que ya se entregaron es lo más corriente del mundo.
 El botón ▷ mide por su cuenta quién está listo. A quien le falte la plantilla
 de la cuenta no se le impide el informe.
 
+## Solo un contrato
+
+Para generar todos los informes de un contrato —lo corriente al terminar de
+registrarlo—, elija el contrato en **Solo un contrato**, debajo de los meses.
+Kaori marca los meses de ese contrato y, en cada uno, sólo a él: basta pulsar
+Generar. Si el contrato es de otro año, cambia al suyo. Si cruza de un año al
+siguiente, marca los del año que se ve y avisa de los demás. El último
+contrato trabajado sale el primero de la lista.
+
 ## Cada mes, desplegable
 
 En la tabla de **Generar mes** cada mes es una franja que se despliega o
@@ -277,9 +286,10 @@ acredita —el del informe—, no aquel en que se pagó.
 
 Ya anotada, se pulsa sobre el número para corregirla o quitarla.
 
-**Si un mes no tiene planilla, esa fila del informe sale vacía.** No se deja lo
-que traiga la plantilla, que sería el número de seguridad social de otro
-contratista en un documento que se firma.
+**Si un mes no tiene planilla anotada**, el número y la fecha salen en blanco
+para escribirlos a mano, y **MES DE PAGO lleva el mes del informe**: el de
+enero dice «enero». Nunca se deja lo que traiga la plantilla, que sería el
+número de seguridad social de otro contratista en un documento que se firma.
 
 ## Contrato nuevo con los datos del anterior
 
@@ -443,11 +453,33 @@ trabajo:
   copiar las de la plantilla — que son las de otro contratista, y ese era el
   problema. Se muestran para revisarlas antes de aceptarlas.
 - **Una a una**, con el botón «Agregar una».
+- **Leerlas del contrato.** «Leer de una foto o PDF» toma la página donde están
+  las obligaciones específicas —numeradas 1, 2, 3… hasta el «Parágrafo»— y
+  pone cada una en su campo. Sirve una foto hecha con el teléfono. Con una
+  clave de IA (Gemini o Claude) se le manda el documento y las transcribe tal
+  cual: con una foto de ejemplo salieron las 15 sin un error, en unos 7
+  segundos. Sin IA las lee el reconocimiento de texto del propio equipo, que
+  con una foto buena acierta la mayoría pero puede confundir letras donde hay
+  sombras: conviene revisarlas. Si el contrato ya tenía obligaciones, Kaori
+  pregunta si reemplazarlas o agregar las leídas al final, y se puede
+  deshacer.
 
 Las **ACTIVIDADES EJECUTADAS** salen de las obligaciones, en pasado. El botón
 «Redactar las que faltan» respeta lo que ya esté escrito y sólo completa los
 huecos. Con clave de IA quedan mejor redactadas; sin ella las conjuga por
 reglas gramaticales, que también funciona sin conexión.
+
+Cada tabla del informe las escribe a su manera:
+
+| Tabla | Quién habla | Cómo sale |
+|---|---|---|
+| Informe de actividad (la primera) | El contratista | «Se apoyó en las labores…» |
+| DETALLE DE LA EJECUCIÓN (la del supervisor) | El supervisor, sobre el contratista | «Apoyó en las labores…» |
+
+Se escriben una sola vez, en impersonal, y la segunda tabla las pasa a
+tercera persona al generar. El verbo concuerda: «Se realizaron actividades»
+pasa a «Realizó actividades». Los verbos que llevan «se» de por sí, como «Se
+reunió con el supervisor», se dejan como están.
 
 ## Mayúsculas y minúsculas
 
@@ -567,6 +599,14 @@ obligaciones y pasado impersonal para las actividades, y la prohibición de
 inventar cifras, fechas o nombres. Con Gemini, Kaori elige solo el modelo
 «Flash» estable más reciente que ofrezca la clave, porque Google retira modelos
 cada pocos meses y uno fijado a mano dejaría de funcionar sin aviso.
+
+**Cuando Gemini falla.** Google tiene a menudo algún modelo saturado (responde
+503, «alta demanda»), otros sin cuota para la clave (429) y otros retirados
+aunque sigan en la lista (404). Kaori prueba los modelos de uno en uno, aparta
+un rato los que fallan y se queda con el primero que responde. Si fallan
+todos, **no escribe nada a escondidas**: dice por qué y ofrece **Reintentar** o
+**Redactar por reglas, sin IA**. Para rehacer con la IA unas actividades ya
+escritas está **Volver a redactar todas**.
 
 Las claves se guardan cifradas por Windows y sólo las usa el proceso principal
 del programa. No llegan a la interfaz ni al teléfono. Antes llegaban, y eso

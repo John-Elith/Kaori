@@ -33,7 +33,13 @@ import { HistorialInformes } from '../componentes/HistorialInformes';
 import { SeccionCertificados } from '../componentes/Certificados';
 import { NOMBRES_MES } from '../../core/espanol/calendario';
 import { podarHistorial } from '../../core/modelo/historial';
-import { porActividad, ultimaActividad } from '../../core/modelo/actividad';
+import {
+  aniosDelContrato,
+  mesesDelContratoEn,
+  porActividad,
+  ultimaActividad,
+} from '../../core/modelo/actividad';
+import type { Contrato } from '../../core/modelo/tipos';
 import { TIPOS_DOCUMENTO, type TipoDocumento } from '../../core/docx/campos';
 import type { InformeMes, Planilla } from '../../core/modelo/tipos';
 import type { ProgresoGeneracion } from '../../electron/preload';
@@ -368,12 +374,75 @@ export function PaginaGenerarMes() {
   // volver a la pantalla eso borraría lo recordado y re-marcaría todo, que es
   // justo lo contrario de lo que se quiere.
   const anioAnterior = useRef(anio);
+  /**
+   * Meses que «Solo un contrato» ya dejó marcados en el año al que salta: no
+   * deben rellenarse con todos los contratos al llegar a ese año.
+   */
+  const iniciadosAlCambiarDeAnio = useRef<string[] | null>(null);
   useEffect(() => {
     if (anioAnterior.current === anio) return;
     anioAnterior.current = anio;
-    mesesIniciados.current = new Set();
-    setIniciados(new Set());
+    mesesIniciados.current = new Set(iniciadosAlCambiarDeAnio.current ?? []);
+    iniciadosAlCambiarDeAnio.current = null;
+    setIniciados(new Set(mesesIniciados.current));
   }, [anio, setIniciados]);
+
+  /** Contratos activos, el último trabajado primero: para «Solo un contrato». */
+  const contratosPorActividad = useMemo(() => {
+    if (!base) return [];
+    return contratosActivos
+      .map((c) => ({
+        contrato: c,
+        contratista: base.contratistas.find((k) => k.id === c.contratistaId)?.nombre ?? '—',
+        actividad: ultimaActividad(c, base),
+        fechaInicio: c.fechaInicio,
+        numero: c.numero,
+      }))
+      .sort(porActividad);
+  }, [base, contratosActivos]);
+
+  const [avisoSoloUno, setAvisoSoloUno] = useState<string | null>(null);
+
+  /**
+   * Marca los meses de un contrato y, en cada uno, sólo ese contrato.
+   *
+   * Es lo corriente al terminar de registrar un contrato: generar todos sus
+   * informes de una vez. Antes había que marcar sus meses y luego, mes por mes,
+   * desmarcar a todos los demás.
+   */
+  function soloUnContrato(contratoId: string) {
+    const c = contratosActivos.find((x) => x.id === contratoId);
+    if (!c) return;
+
+    // El año que se está viendo si el contrato tiene meses en él; si no, el
+    // primero del contrato.
+    const anios = aniosDelContrato(c);
+    const destino = mesesDelContratoEn(c, anio).length > 0 ? anio : anios[0];
+    if (destino === undefined) return;
+    const suyos = mesesDelContratoEn(c, destino);
+
+    // Esos meses cuentan como ya iniciados: el marcado automático, que marca a
+    // todos los contratos la primera vez que se elige un mes, no debe tocarlos.
+    const marcas = suyos.map((m) => `${destino}-${m}`);
+    if (destino !== anio) {
+      iniciadosAlCambiarDeAnio.current = marcas;
+      setAnio(destino);
+    } else {
+      for (const m of marcas) mesesIniciados.current.add(m);
+      setIniciados(new Set(mesesIniciados.current));
+    }
+
+    setMeses(new Set(suyos));
+    setSeleccion(new Set(suyos.map((m) => clave(m, contratoId))));
+
+    const otros = anios.filter((a) => a !== destino);
+    setAvisoSoloUno(
+      `Marcado sólo el ${c.numero || 'contrato'} en ${listaDeMeses(suyos)} de ${destino}.` +
+        (otros.length > 0
+          ? ` El contrato sigue en ${otros.join(' y ')}: para esos meses, cambie el año y elíjalo otra vez.`
+          : ''),
+    );
+  }
 
   // Suscripción al avance del lote.
   useEffect(() => {
@@ -852,7 +921,18 @@ export function PaginaGenerarMes() {
             anio={anio}
             meses={meses}
             deshabilitado={generando}
-            alCambiar={setMeses}
+            alCambiar={(m) => {
+              // Cambiar los meses a mano deja de ser «solo un contrato».
+              setAvisoSoloUno(null);
+              setMeses(m);
+            }}
+          />
+
+          <SoloUnContrato
+            contratos={contratosPorActividad}
+            deshabilitado={generando}
+            aviso={avisoSoloUno}
+            alElegir={soloUnContrato}
           />
         </section>
 
@@ -1227,6 +1307,56 @@ function SelectorDeAnio({
  * no hay que pedirle a nadie. Con doce casillas siempre visibles, «enero,
  * marzo y abril» son tres clics y se ve de un vistazo qué quedó marcado.
  */
+/**
+ * «Solo un contrato»: marca los meses de un contrato y, en cada uno, sólo él.
+ *
+ * El último contrato trabajado sale el primero, porque suele ser el recién
+ * registrado, que es con el que se usa esto.
+ */
+function SoloUnContrato({
+  contratos,
+  deshabilitado,
+  aviso,
+  alElegir,
+}: {
+  contratos: { contrato: Contrato; contratista: string; actividad?: string }[];
+  deshabilitado: boolean;
+  aviso: string | null;
+  alElegir: (contratoId: string) => void;
+}) {
+  if (contratos.length === 0) return null;
+  const mesCorto = (iso: string) => {
+    const [a, m] = iso.split('-').map(Number);
+    return `${NOMBRES_MES[m - 1]?.slice(0, 3) ?? '?'}. ${a}`;
+  };
+
+  return (
+    <div>
+      <label className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="etiqueta mb-0">Solo un contrato</span>
+        <select
+          className="campo w-auto min-w-0 max-w-full flex-1 py-1.5 sm:flex-none"
+          value=""
+          disabled={deshabilitado}
+          onChange={(e) => e.target.value && alElegir(e.target.value)}
+        >
+          <option value="">Elegir un contrato para marcar todos sus meses…</option>
+          {contratos.map(({ contrato: c, contratista, actividad }, i) => (
+            <option key={c.id} value={c.id}>
+              {c.numero || '(sin número)'} · {contratista} · {mesCorto(c.fechaInicio)} – {mesCorto(c.fechaTerminacion)}
+              {i === 0 && actividad ? ' (último trabajado)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="mt-1.5 text-xs text-tinta-tenue">
+        {aviso ??
+          'Marca los meses de ese contrato y, en cada uno, sólo a él: para generar todos sus informes de una vez.'}
+      </p>
+    </div>
+  );
+}
+
 function SelectorDeMeses({
   anio,
   meses,

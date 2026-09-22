@@ -20,6 +20,7 @@ import {
   ESQUEMA_ACTIVIDADES,
   ESQUEMA_OBLIGACIONES,
   instruccionesActividades,
+  instruccionesLeerObligaciones,
   instruccionesObligaciones,
 } from './instruccionesRedaccion';
 
@@ -258,6 +259,36 @@ export async function proponerObligacionesConIA(
     messages: [{ role: 'user', content: i.usuario }],
   });
 
+  const r = leerJson<{ obligaciones: string[] }>(respuesta);
+  return (r.obligaciones ?? []).map((o) => o.trim()).filter((o) => o.length > 0);
+}
+
+/**
+ * Lee las OBLIGACIONES ESPECÍFICAS de la imagen o el PDF de un contrato con
+ * Claude. Las instrucciones son las mismas que recibe Gemini.
+ */
+export async function leerObligacionesConIA(
+  apiKey: string,
+  contenido: Buffer,
+  extension: string,
+): Promise<string[]> {
+  const i = instruccionesLeerObligaciones();
+  const respuesta = await cliente(apiKey).messages.create({
+    model: MODELO,
+    max_tokens: 8000,
+    thinking: { type: 'adaptive' },
+    output_config: {
+      effort: 'medium',
+      format: { type: 'json_schema', schema: ESQUEMA_OBLIGACIONES },
+    },
+    system: i.sistema,
+    messages: [
+      {
+        role: 'user',
+        content: [bloqueDesdeArchivo(contenido, extension) as never, { type: 'text', text: i.usuario }],
+      },
+    ],
+  });
   const r = leerJson<{ obligaciones: string[] }>(respuesta);
   return (r.obligaciones ?? []).map((o) => o.trim()).filter((o) => o.length > 0);
 }

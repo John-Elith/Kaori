@@ -12,6 +12,7 @@ import {
   elegirModelo,
   generarJson,
   mejorModelo,
+  modelosCandidatos,
   MODELO_POR_DEFECTO,
 } from '../core/extraccion/gemini';
 import {
@@ -168,6 +169,108 @@ describe('los errores se entienden', () => {
     }) as unknown as typeof fetch;
     await expect(elegirModelo('k-reintento', f)).rejects.toThrow();
     await expect(elegirModelo('k-reintento', f)).resolves.toBe('gemini-3.0-flash');
+  });
+});
+
+describe('cuando un modelo falla, se pasa al siguiente', () => {
+  // Lo que se vio con una cuenta real: el modelo más nuevo daba 429 (sin
+  // cuota), el siguiente 503 (saturado), uno viejo 404 (retirado) y el de
+  // detrás respondía en un segundo. Antes Kaori insistía con el primero, se le
+  // acababa el tiempo y caía a las reglas sin decir nada.
+  const CUENTA = {
+    models: ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'].map(
+      (n) => ({ name: `models/${n}`, supportedGenerationMethods: ['generateContent'] }),
+    ),
+  };
+  const error = (estado: number, message: string) => ({ estado, json: { error: { message } } });
+  const bien = { json: respuesta('{"actividades":["Se limpiaron las redes."]}') };
+  const pedido = instruccionesActividades(['Limpiar las redes.'], true);
+
+  /** Google según el modelo, como en la cuenta real. */
+  function cuentaReal(funciona: (m: string) => boolean = (m) => m === 'gemini-3.6-flash') {
+    return googleFalso((url) => {
+      if (url.includes('/models?')) return { json: CUENTA };
+      const m = /models\/([^:]+):/.exec(url)![1];
+      if (funciona(m)) return bien;
+      if (m === 'gemini-3.8-flash') return error(429, 'Quota exceeded');
+      if (m === 'gemini-3.7-flash') return error(503, 'This model is currently experiencing high demand.');
+      if (m === 'gemini-2.5-flash') return error(404, 'models/gemini-2.5-flash is not found');
+      return error(503, 'overloaded');
+    });
+  }
+  const modeloDe = (l: Llamada) => /models\/([^:?]+)[:?]/.exec(l.url)?.[1];
+
+  it('los candidatos: flash del más nuevo al más viejo, luego los lite', () => {
+    expect(modelosCandidatos(MODELOS.models.map((m) => m.name))).toEqual([
+      'gemini-3.0-flash',
+      'gemini-2.5-flash',
+      'gemini-3.5-flash-lite',
+    ]);
+  });
+
+  it('salta el sin cuota y el saturado, un intento cada uno, y usa el que responde', async () => {
+    const g = cuentaReal();
+    const r = await generarJson<{ actividades: string[] }>('k-real-1', pedido, g.fetch);
+    expect(r.actividades).toEqual(['Se limpiaron las redes.']);
+    expect(g.llamadas.filter((l) => l.init.method === 'POST').map(modeloDe)).toEqual([
+      'gemini-3.8-flash',
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
+    ]);
+  });
+
+  it('la próxima vez empieza por el que respondió, sin repetir los fallos', async () => {
+    const g = cuentaReal();
+    await generarJson('k-real-2', pedido, g.fetch);
+    const antes = g.llamadas.length;
+    await generarJson('k-real-2', pedido, g.fetch);
+    expect(g.llamadas.slice(antes).map(modeloDe)).toEqual(['gemini-3.6-flash']);
+  });
+
+  it('aparta los que fallaron: si el bueno se satura, no vuelve a ellos enseguida', async () => {
+    let bueno = 'gemini-3.6-flash';
+    const g = cuentaReal((m) => m === bueno);
+    await generarJson('k-real-3', pedido, g.fetch);
+    // Ahora el 3.6 se satura y sólo responde el lite.
+    bueno = 'gemini-3.5-flash-lite';
+    const antes = g.llamadas.length;
+    const r = await generarJson<{ actividades: string[] }>('k-real-3', pedido, g.fetch);
+    expect(r.actividades).toEqual(['Se limpiaron las redes.']);
+    // Ni el 3.8 (sin cuota) ni el 3.7 (saturado) se repiten. El 2.5 sí se
+    // prueba: la primera vez no hizo falta llegar a él.
+    expect(g.llamadas.slice(antes).map(modeloDe)).toEqual([
+      'gemini-3.6-flash',
+      'gemini-2.5-flash',
+      'gemini-3.5-flash-lite',
+    ]);
+  });
+
+  it('si todos fallan, lo dice claro y cuántos probó', async () => {
+    const g = cuentaReal(() => false);
+    await expect(generarJson('k-real-4', pedido, g.fetch)).rejects.toThrow(/probaron 5 modelos/);
+  });
+
+  it('no se pasa del tiempo máximo', async () => {
+    let t = 0;
+    const g = googleFalso((url) => {
+      if (url.includes('/models?')) return { json: CUENTA };
+      t += 40_000; // cada modelo tarda 40 s en fallar
+      return error(503, 'high demand');
+    });
+    await expect(
+      generarJson('k-real-5', pedido, { fetchImpl: g.fetch, ahora: () => t }),
+    ).rejects.toThrow(/probaron 3 modelos/);
+  });
+
+  it('una clave mala no se prueba con otros modelos: insistir no lo arregla', async () => {
+    let n = 0;
+    const g = googleFalso((url) => {
+      if (url.includes('/models?')) return { json: CUENTA };
+      n++;
+      return error(400, 'API key not valid.');
+    });
+    await expect(generarJson('k-real-6', pedido, g.fetch)).rejects.toThrow(/no es válida/);
+    expect(n).toBe(1);
   });
 });
 

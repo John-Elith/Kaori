@@ -65,6 +65,7 @@ const ARGUMENTO_CON_RUTA: Record<string, number> = {
   'extraccion:texto': 0,
   'extraccion:contrato': 0,
   'extraccion:planilla': 0,
+  'extraccion:obligaciones': 0,
 };
 
 export function canalPermitido(canal: string): boolean {

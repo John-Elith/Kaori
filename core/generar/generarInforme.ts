@@ -130,7 +130,8 @@ export function generarInforme(opciones: OpcionesGeneracion): ResultadoGeneracio
   // Y la planilla del mes. Sin planilla la fila queda vacía, que es lo correcto:
   // dejar la de la plantilla sería publicar el número de seguridad social de
   // otro contratista en un documento que se firma.
-  const conPlanilla = llenarTablaPlanilla(conBalance.partes, datos.planilla);
+  // Sin planilla anotada, al menos sale el mes de pago: el del informe.
+  const conPlanilla = llenarTablaPlanilla(conBalance.partes, datos.planilla, datos.mes);
   if (conPlanilla.avisos.length > 0) avisos.push(...conPlanilla.avisos);
 
   // No se toca la paginación.

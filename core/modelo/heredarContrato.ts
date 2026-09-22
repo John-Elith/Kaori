@@ -84,16 +84,30 @@ function enMayusculas(texto: string): boolean {
   return mayus > minus;
 }
 
+/** Si las fechas del contrato permiten repartir el sueldo y redactar el plazo. */
+export function fechasCoherentes(c: Pick<Contrato, 'fechaInicio' | 'fechaTerminacion'>): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(c.fechaInicio) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(c.fechaTerminacion) &&
+    c.fechaInicio <= c.fechaTerminacion;
+}
+
 export function heredarDeContrato(nuevo: Contrato, anterior: Contrato): Contrato {
   const mensual = mensualidadHabitual(anterior.cuotas);
+  // Con las fechas al revés —un año mal escrito— no hay entre qué fechas
+  // repartir el sueldo ni plazo que redactar. Se copia todo lo demás y eso se
+  // deja para cuando se corrijan; antes, esto fallaba y el sueldo se perdía.
+  const coherentes = fechasCoherentes(nuevo);
 
   // Sin cuotas en el anterior no hay sueldo que repartir: se deja lo que haya.
   const cuotas =
-    mensual > 0 ? cuotasProrrateadas(nuevo.fechaInicio, nuevo.fechaTerminacion, mensual) : nuevo.cuotas;
-  const valorInicial = mensual > 0 ? cuotas.reduce((s, c) => s + c.valor, 0) : nuevo.valorInicial;
+    mensual > 0 && coherentes
+      ? cuotasProrrateadas(nuevo.fechaInicio, nuevo.fechaTerminacion, mensual)
+      : nuevo.cuotas;
+  const valorInicial =
+    mensual > 0 && coherentes ? cuotas.reduce((s, c) => s + c.valor, 0) : nuevo.valorInicial;
 
   let textoPlazo = '';
-  if (anterior.textoPlazo.trim()) {
+  if (anterior.textoPlazo.trim() && coherentes) {
     const frase = frasePlazo(desdeISO(nuevo.fechaInicio), desdeISO(nuevo.fechaTerminacion));
     // Se respeta cómo lo escribía: en mayúsculas o en frase normal.
     textoPlazo = enMayusculas(anterior.textoPlazo)

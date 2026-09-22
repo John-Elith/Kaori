@@ -8,6 +8,35 @@
  */
 
 import type { BaseDeDatos, Contrato } from './tipos';
+import { desdeISO } from '../espanol/calendario';
+import { fechaTerminacionVigente } from '../pagos/cronograma';
+
+/**
+ * Los meses (1–12) de un año en que el contrato está vigente, con las
+ * prórrogas incluidas. Sirve para marcar de una vez «este contrato, todos sus
+ * meses» en Generar mes.
+ */
+export function mesesDelContratoEn(contrato: Contrato, anio: number): number[] {
+  if (!contrato.fechaInicio || !contrato.fechaTerminacion) return [];
+  const ini = desdeISO(contrato.fechaInicio);
+  const fin = fechaTerminacionVigente(contrato);
+  const meses: number[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const clave = anio * 12 + m;
+    if (clave >= ini.anio * 12 + ini.mes && clave <= fin.anio * 12 + fin.mes) meses.push(m);
+  }
+  return meses;
+}
+
+/** Los años que toca el contrato, en orden. */
+export function aniosDelContrato(contrato: Contrato): number[] {
+  if (!contrato.fechaInicio || !contrato.fechaTerminacion) return [];
+  const ini = desdeISO(contrato.fechaInicio).anio;
+  const fin = fechaTerminacionVigente(contrato).anio;
+  const anios: number[] = [];
+  for (let a = ini; a <= fin && anios.length < 50; a++) anios.push(a);
+  return anios;
+}
 
 /** El último momento en que se hizo algo con el contrato, en ISO. */
 export function ultimaActividad(

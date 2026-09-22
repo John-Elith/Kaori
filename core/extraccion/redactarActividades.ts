@@ -171,6 +171,66 @@ function mayuscula(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/**
+ * Verbos en los que el «se» es del propio verbo y no de la pasiva: «Se reunió
+ * con el supervisor» es lo que hizo el contratista, y quitarle el «se» lo
+ * rompería («Reunió con el supervisor»). Con estos la frase se deja tal cual,
+ * que ya está en pasado y se entiende.
+ */
+const PRONOMINALES = new Set([
+  'reunió', 'reunieron', 'comunicó', 'comunicaron', 'presentó', 'presentaron',
+  'desplazó', 'desplazaron', 'trasladó', 'trasladaron', 'capacitó', 'capacitaron',
+  'dirigió', 'dirigieron', 'encargó', 'encargaron', 'abstuvo', 'abstuvieron',
+  'acogió', 'acogieron', 'ajustó', 'ajustaron', 'adhirió', 'adhirieron',
+  'sujetó', 'sujetaron', 'dedicó', 'dedicaron', 'esforzó', 'esforzaron',
+  'mantuvo', 'mantuvieron', 'mostró', 'mostraron', 'dispuso', 'dispusieron',
+]);
+
+/** «realizaron» → «realizó»; «hicieron» → «hizo». */
+function aSingular(plural: string): string | null {
+  const v = plural.toLowerCase();
+  for (const [infinitivo, forma] of Object.entries(IRREGULARES_PLURAL)) {
+    if (forma === v) return IRREGULARES[infinitivo];
+  }
+  if (v.endsWith('aron')) return `${v.slice(0, -4)}ó`;
+  if (v.endsWith('yeron')) return `${v.slice(0, -5)}yó`;
+  if (v.endsWith('ieron')) return `${v.slice(0, -5)}ió`;
+  return null;
+}
+
+/**
+ * La actividad en tercera persona, para el informe de supervisión.
+ *
+ * El contratista redacta su informe en impersonal —«Se apoyó en las
+ * labores…»—, pero en DETALLE DE LA EJECUCIÓN es el supervisor quien cuenta lo
+ * que hizo el contratista: «Apoyó en las labores…». Las dos tablas salen de la
+ * misma lista de actividades, así que la segunda se convierte al escribirla.
+ *
+ * En la pasiva el verbo concuerda con el objeto y aquí con el contratista:
+ *   «Se realizaron actividades de limpieza» → «Realizó actividades de limpieza»
+ *   «Se le brindó apoyo al supervisor»      → «Le brindó apoyo al supervisor»
+ *
+ * Lo que no empieza por «Se» + verbo en pasado se deja como está: ya viene en
+ * tercera persona o lo escribió alguien a su manera.
+ */
+export function aTerceraPersona(actividad: string): string {
+  const m = /^(\s*)se\s+(?:(le|les)\s+)?([\p{L}]+)([\s\S]*)$/iu.exec(actividad);
+  if (!m) return actividad;
+  const [, espacio, cliticos, verbo, resto] = m;
+  const v = verbo.toLowerCase();
+
+  if (PRONOMINALES.has(v)) return actividad;
+
+  const esSingular =
+    /[óé]$/.test(v) || Object.values(IRREGULARES).includes(v);
+  const singular = esSingular ? v : aSingular(v);
+  if (!singular) return actividad; // no es un verbo en pasado: mejor no tocar
+
+  return cliticos
+    ? `${espacio}${mayuscula(cliticos.toLowerCase())} ${singular}${resto}`
+    : `${espacio}${mayuscula(singular)}${resto}`;
+}
+
 /** Redacta todas las actividades que falten, conservando las ya escritas. */
 export function completarActividades(
   obligaciones: { n: number; texto: string; actividad?: string }[],

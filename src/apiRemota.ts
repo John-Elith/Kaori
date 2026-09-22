@@ -226,6 +226,7 @@ export function crearApiRemota(): Api {
       texto: canal('extraccion:texto'),
       contrato: canal('extraccion:contrato'),
       planilla: canal('extraccion:planilla'),
+      obligaciones: canal('extraccion:obligaciones'),
       proponerObligaciones: canal('extraccion:proponerObligaciones'),
       redactarActividades: canal('extraccion:redactar'),
     },

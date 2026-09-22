@@ -12,6 +12,8 @@ import {
   ArrowDownUp,
   X,
   Copy,
+  ScanLine,
+  Undo2,
 } from 'lucide-react';
 
 import { useEstado } from '../estado';
@@ -38,11 +40,30 @@ import { frasePlazo } from '../../core/espanol/fechaEnLetras';
 import { montoALetras } from '../../core/espanol/numeroALetras';
 import { redactarFormaDePago } from '../../core/generar/formaDePago';
 import { enviarAPapelera } from '../../core/modelo/papelera';
-import { heredarDeContrato } from '../../core/modelo/heredarContrato';
+import { completarActividades } from '../../core/extraccion/redactarActividades';
+import {
+  fechasCoherentes,
+  heredarDeContrato,
+  mensualidadHabitual,
+} from '../../core/modelo/heredarContrato';
 import {
   partirEnObligaciones,
   renumerar,
 } from '../../core/extraccion/listaDeObligaciones';
+
+/**
+ * Si la fecha de inicio va después de la de terminación, el aviso que lo
+ * explica; si no, null. Pasa sobre todo por un año mal escrito: 01/07/2026
+ * en vez de 01/07/2025.
+ */
+function fechasInvertidas(c: Pick<Contrato, 'fechaInicio' | 'fechaTerminacion'>): string | null {
+  if (!c.fechaInicio || !c.fechaTerminacion || c.fechaInicio <= c.fechaTerminacion) return null;
+  return (
+    `La fecha de inicio (${formatoCorto(desdeISO(c.fechaInicio))}) es posterior a la de ` +
+    `terminación (${formatoCorto(desdeISO(c.fechaTerminacion))}): puede que el año esté mal ` +
+    'escrito.'
+  );
+}
 
 function contratoNuevo(
   id: string,
@@ -703,6 +724,11 @@ function EditorContrato({
       v === 'datos' || v === 'pagos' || v === 'obligaciones' || v === 'novedades',
   );
   const [redactando, setRedactando] = useState(false);
+  /** Cómo fue la última redacción de actividades: con qué, o por qué falló. */
+  const [avisoRedaccion, setAvisoRedaccion] = useState<{
+    tipo: 'exito' | 'error';
+    texto: string;
+  } | null>(null);
 
   /**
    * Teléfonos y cuentas que esta persona ya ha usado.
@@ -741,19 +767,47 @@ function EditorContrato({
     alVolver();
   }
 
-  async function redactarActividades() {
+  /** `todas`: también las ya escritas, para rehacerlas (p. ej. con la IA). */
+  async function redactarActividades(todas = false) {
     setRedactando(true);
+    setAvisoRedaccion(null);
     try {
-      const r = await window.api.extraccion.redactarActividades(contrato.obligaciones, true);
+      const lista = todas
+        ? contrato.obligaciones.map((o) => ({ ...o, actividad: undefined }))
+        : contrato.obligaciones;
+      const r = await window.api.extraccion.redactarActividades(lista, true);
+      if (r.motor === 'fallo') {
+        // La IA configurada no respondió: no se escribe nada a escondidas.
+        setAvisoRedaccion({ tipo: 'error', texto: r.error ?? 'La IA no respondió.' });
+        return;
+      }
       set({
         obligaciones: contrato.obligaciones.map((o, i) => ({
           ...o,
           actividad: r.actividades[i] ?? o.actividad,
         })),
       });
+      setAvisoRedaccion({
+        tipo: 'exito',
+        texto:
+          r.motor === 'ia'
+            ? `Redactadas con ${r.proveedor ?? 'IA'}. Revíselas antes de generar.`
+            : 'Redactadas por reglas gramaticales, porque no hay ninguna clave de IA en Ajustes.',
+      });
+    } catch (e) {
+      setAvisoRedaccion({ tipo: 'error', texto: e instanceof Error ? e.message : String(e) });
     } finally {
       setRedactando(false);
     }
+  }
+
+  /** La salida de siempre, sin IA: cuando la IA falla y no se quiere esperar. */
+  function redactarPorReglas() {
+    const actividades = completarActividades(contrato.obligaciones, true);
+    set({
+      obligaciones: contrato.obligaciones.map((o, i) => ({ ...o, actividad: actividades[i] })),
+    });
+    setAvisoRedaccion({ tipo: 'exito', texto: 'Redactadas por reglas gramaticales.' });
   }
 
   const PESTANAS = [
@@ -887,6 +941,14 @@ function EditorContrato({
                 onChange={(e) => set({ fechaFirma: e.target.value })}
               />
             </Campo>
+            {fechasInvertidas(contrato) && (
+              <div className="sm:col-span-2">
+                <Aviso tipo="error" titulo="Las fechas están al revés">
+                  {fechasInvertidas(contrato)} Mientras tanto no se puede generar el
+                  cronograma de pagos ni ningún documento.
+                </Aviso>
+              </div>
+            )}
             {/* Una plantilla por documento: los tres salen del mismo contrato
                 pero de moldes de Word distintos. */}
             <Campo etiqueta="Plantilla del informe">
@@ -1184,6 +1246,8 @@ function EditorContrato({
             set={set}
             redactando={redactando}
             alRedactar={redactarActividades}
+            avisoRedaccion={avisoRedaccion}
+            alRedactarPorReglas={redactarPorReglas}
           />
         )}
 
@@ -1232,19 +1296,40 @@ function PestanaPagos({
     return lista;
   }, [contrato.fechaInicio, contrato.fechaTerminacion]);
 
+  /**
+   * Lo que impide generar el cronograma, dicho para poder arreglarlo.
+   *
+   * Antes el botón fallaba en silencio: con la fecha de inicio después de la
+   * de terminación —un año mal puesto— no pasaba nada y no se sabía por qué.
+   */
+  const [errorCronograma, setErrorCronograma] = useState<string | null>(null);
+  const invertidas = fechasInvertidas(contrato);
+  const fechasAlReves = invertidas && `${invertidas} Corríjalas en la pestaña Datos.`;
+
   function generar() {
+    setErrorCronograma(null);
+    if (fechasAlReves) {
+      setErrorCronograma(fechasAlReves);
+      return;
+    }
     const porMes: Record<string, number> = {};
     for (const e of excepciones) {
       if (e.clave && e.valor > 0) porMes[e.clave] = e.valor;
     }
-    set({
-      cuotas: generarCronograma({
-        fechaInicio: contrato.fechaInicio,
-        fechaTerminacion: contrato.fechaTerminacion,
-        valorMensual: mensual,
-        porMes,
-      }),
-    });
+    try {
+      set({
+        cuotas: generarCronograma({
+          fechaInicio: contrato.fechaInicio,
+          fechaTerminacion: contrato.fechaTerminacion,
+          valorMensual: mensual,
+          porMes,
+        }),
+      });
+    } catch (e) {
+      setErrorCronograma(
+        `No se pudo generar el cronograma: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   return (
@@ -1353,16 +1438,30 @@ function PestanaPagos({
           </div>
         )}
 
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center gap-3">
           <Boton
             variante="primario"
             icono={<CalendarClock size={16} />}
             disabled={mensual <= 0}
+            title={mensual <= 0 ? 'Escriba primero el importe de los meses completos' : undefined}
             onClick={generar}
           >
             Generar cronograma
           </Boton>
+          {mensual <= 0 && (
+            <span className="text-xs text-tinta-tenue">
+              Escriba primero el importe de los meses completos.
+            </span>
+          )}
         </div>
+
+        {(errorCronograma ?? fechasAlReves) && (
+          <div className="mt-4">
+            <Aviso tipo="error" titulo="Revise las fechas del contrato">
+              {errorCronograma ?? fechasAlReves}
+            </Aviso>
+          </div>
+        )}
       </section>
 
       {contrato.cuotas.length > 0 && (
@@ -1479,12 +1578,82 @@ function PestanaObligaciones({
   set,
   redactando,
   alRedactar,
+  avisoRedaccion,
+  alRedactarPorReglas,
 }: {
   contrato: Contrato;
   set: (p: Partial<Contrato>) => void;
   redactando: boolean;
-  alRedactar: () => Promise<void>;
+  alRedactar: (todas?: boolean) => Promise<void>;
+  avisoRedaccion: { tipo: 'exito' | 'error'; texto: string } | null;
+  alRedactarPorReglas: () => void;
 }) {
+  /** Si el último intento fue de todas, el reintento también lo es. */
+  const [ultimoTodas, setUltimoTodas] = useState(false);
+
+  // ── Leer las obligaciones de una foto o PDF del contrato ──
+  const [leyendo, setLeyendo] = useState(false);
+  /** Lo leído, esperando a que se elija reemplazar o agregar. */
+  const [leidas, setLeidas] = useState<{ obligaciones: string[]; origen: string } | null>(null);
+  const [avisoLectura, setAvisoLectura] = useState<{
+    tipo: 'exito' | 'error' | 'alerta';
+    texto: string;
+  } | null>(null);
+  /** Las obligaciones de antes de leer, para poder deshacer. */
+  const [antesDeLeer, setAntesDeLeer] = useState<Obligacion[] | null>(null);
+  const hayEscritas = contrato.obligaciones.some((o) => o.texto.trim().length > 0);
+
+  async function leerDeArchivo() {
+    const ruta = await window.api.sistema.elegirArchivo([
+      { name: 'Contrato (foto o PDF)', extensions: ['jpg', 'jpeg', 'png', 'webp', 'pdf'] },
+    ]);
+    if (!ruta) return;
+    setLeyendo(true);
+    setAvisoLectura(null);
+    setLeidas(null);
+    try {
+      const r = await window.api.extraccion.obligaciones(ruta);
+      if (!r.ok) {
+        setAvisoLectura({ tipo: 'error', texto: r.error });
+        return;
+      }
+      const origen = r.motor === 'ia' ? `con ${r.proveedor ?? 'IA'}` : 'sin IA';
+      if (hayEscritas) {
+        // Ya había obligaciones: que decida la persona.
+        setLeidas({ obligaciones: r.obligaciones, origen });
+        if (r.aviso) setAvisoLectura({ tipo: 'alerta', texto: r.aviso });
+      } else {
+        aplicarLeidas(r.obligaciones, 'reemplazar', origen, r.aviso);
+      }
+    } catch (e) {
+      setAvisoLectura({ tipo: 'error', texto: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setLeyendo(false);
+    }
+  }
+
+  function aplicarLeidas(
+    textos: string[],
+    modo: 'reemplazar' | 'agregar',
+    origen: string,
+    aviso?: string,
+  ) {
+    setAntesDeLeer(contrato.obligaciones);
+    const base = modo === 'agregar' ? contrato.obligaciones.filter((o) => o.texto.trim()) : [];
+    set({ obligaciones: renumerar([...base, ...textos.map((texto) => ({ n: 0, texto }))]) });
+    setLeidas(null);
+    setAvisoLectura({
+      tipo: aviso ? 'alerta' : 'exito',
+      texto:
+        `Se ${modo === 'agregar' ? 'agregaron al final' : 'pusieron'} ${textos.length} obligaciones ` +
+        `leídas ${origen}. Revíselas antes de generar.` +
+        (aviso ? ` ${aviso}` : ''),
+    });
+  }
+  const redactar = (todas = false) => {
+    setUltimoTodas(todas);
+    return alRedactar(todas);
+  };
   function actualizar(i: number, parcial: Partial<Obligacion>) {
     set({
       obligaciones: contrato.obligaciones.map((o, j) =>
@@ -1525,17 +1694,104 @@ function PestanaObligaciones({
             <span className="text-exito-fuerte">todas con actividad</span>
           )}
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {sinActividad > 0 && (
-            <Boton icono={<Wand2 size={15} />} onClick={alRedactar} cargando={redactando}>
+            <Boton icono={<Wand2 size={15} />} onClick={() => void redactar()} cargando={redactando}>
               Redactar las {sinActividad} actividad(es) que faltan
             </Boton>
           )}
+          {sinActividad < contrato.obligaciones.length && (
+            <Boton
+              variante="fantasma"
+              icono={<Wand2 size={15} />}
+              disabled={redactando}
+              title="Reescribe todas las actividades, también las ya escritas"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Se volverán a redactar TODAS las actividades y se reemplazarán las que ya están escritas. ¿Continuar?',
+                  )
+                ) {
+                  void redactar(true);
+                }
+              }}
+            >
+              Volver a redactar todas
+            </Boton>
+          )}
+          <Boton
+            icono={<ScanLine size={15} />}
+            onClick={() => void leerDeArchivo()}
+            cargando={leyendo}
+            title="Lee las obligaciones específicas numeradas de una foto o un PDF del contrato"
+          >
+            {leyendo ? 'Leyendo el contrato…' : 'Leer de una foto o PDF'}
+          </Boton>
           <Boton icono={<Plus size={15} />} onClick={agregar}>
             Agregar una
           </Boton>
         </div>
       </div>
+
+      {leidas && (
+        <Aviso tipo="info" titulo={`Se leyeron ${leidas.obligaciones.length} obligaciones ${leidas.origen}`}>
+          El contrato ya tiene {contrato.obligaciones.length} obligación(es). ¿Qué hago con las leídas?
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Boton
+              variante="primario"
+              onClick={() => aplicarLeidas(leidas.obligaciones, 'reemplazar', leidas.origen)}
+            >
+              Reemplazar las actuales
+            </Boton>
+            <Boton onClick={() => aplicarLeidas(leidas.obligaciones, 'agregar', leidas.origen)}>
+              Agregarlas al final
+            </Boton>
+            <Boton variante="fantasma" onClick={() => setLeidas(null)}>
+              Descartar
+            </Boton>
+          </div>
+        </Aviso>
+      )}
+      {avisoLectura && !leidas && (
+        <Aviso tipo={avisoLectura.tipo}>
+          {avisoLectura.texto}
+          {antesDeLeer && avisoLectura.tipo !== 'error' && (
+            <div className="mt-2">
+              <Boton
+                variante="fantasma"
+                icono={<Undo2 size={14} />}
+                onClick={() => {
+                  set({ obligaciones: antesDeLeer });
+                  setAntesDeLeer(null);
+                  setAvisoLectura({ tipo: 'exito', texto: 'Se dejaron las obligaciones como estaban.' });
+                }}
+              >
+                Deshacer
+              </Boton>
+            </div>
+          )}
+        </Aviso>
+      )}
+
+      {avisoRedaccion?.tipo === 'error' && (
+        <Aviso tipo="error" titulo="No se redactó nada">
+          {avisoRedaccion.texto}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Boton
+              variante="secundario"
+              icono={<Wand2 size={15} />}
+              cargando={redactando}
+              onClick={() => void redactar(ultimoTodas)}
+            >
+              Reintentar
+            </Boton>
+            <Boton variante="fantasma" disabled={redactando} onClick={alRedactarPorReglas}>
+              Redactar por reglas, sin IA
+            </Boton>
+          </div>
+        </Aviso>
+      )}
+      {avisoRedaccion?.tipo === 'exito' && <Aviso tipo="exito">{avisoRedaccion.texto}</Aviso>}
 
       {contrato.obligaciones.length === 0 && (
         <Aviso tipo="info">
@@ -1873,7 +2129,10 @@ function CargarDeOtroContrato({
   const vacio = contrato.objeto.trim() === '' && contrato.obligaciones.length === 0;
   const [abierto, setAbierto] = useState(vacio);
   const [elegido, setElegido] = useState(ordenados[0]?.id ?? '');
-  const [hecho, setHecho] = useState<string | null>(null);
+  /** Lo cargado: de qué contrato, y si el sueldo pudo repartirse. */
+  const [hecho, setHecho] = useState<{ numero: string; repartido: boolean; mensual: number } | null>(
+    null,
+  );
 
   if (ordenados.length === 0) return null;
 
@@ -1883,13 +2142,23 @@ function CargarDeOtroContrato({
 
   if (hecho) {
     return (
-      <Aviso tipo="exito" titulo={`Datos cargados del contrato ${hecho}`}>
-        Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, los
-        datos de pago y las plantillas. El sueldo se repartió en cuotas con las fechas de
-        este contrato, y el plazo y la forma de pago se redactaron de nuevo con ellas.
-        Revise la pestaña Pagos si el primer o el último mes no se pagan completos de otra
-        forma. El número, las fechas, el CDP y el RP siguen siendo los de este contrato.
-      </Aviso>
+      hecho.repartido ? (
+        <Aviso tipo="exito" titulo={`Datos cargados del contrato ${hecho.numero}`}>
+          Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, los
+          datos de pago y las plantillas. El sueldo se repartió en cuotas con las fechas de
+          este contrato, y el plazo y la forma de pago se redactaron de nuevo con ellas.
+          Revise la pestaña Pagos si el primer o el último mes no se pagan completos de otra
+          forma. El número, las fechas, el CDP y el RP siguen siendo los de este contrato.
+        </Aviso>
+      ) : (
+        <Aviso tipo="alerta" titulo={`Datos cargados del contrato ${hecho.numero}, salvo el sueldo`}>
+          Se copiaron el objeto, las obligaciones con sus actividades, el supervisor, los
+          datos de pago y las plantillas. El sueldo no se pudo repartir en cuotas porque
+          las fechas de este contrato están al revés (el inicio va después de la
+          terminación). Corríjalas en Datos y después, en Pagos, genere el cronograma
+          {hecho.mensual > 0 ? ` con ${moneda(hecho.mensual)} al mes, que era el sueldo del otro contrato` : ''}.
+        </Aviso>
+      )
     );
   }
 
@@ -1955,7 +2224,11 @@ function CargarDeOtroContrato({
               return;
             }
             alCargar(anterior);
-            setHecho(anterior.numero || describir(anterior));
+            setHecho({
+              numero: anterior.numero || describir(anterior),
+              repartido: fechasCoherentes(contrato) || mensualidadHabitual(anterior.cuotas) === 0,
+              mensual: mensualidadHabitual(anterior.cuotas),
+            });
           }}
         >
           {ordenados.length > 1 ? 'Cargar sus datos' : `Cargar los datos del ${describir(anterior)}`}

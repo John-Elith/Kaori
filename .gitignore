@@ -18,6 +18,9 @@ release/
 # tiene y se omiten solas en cualquier otro.
 tests/locales/
 
+# Diccionarios del OCR que descarga Tesseract.
+*.traineddata
+
 # Datos del programa, por si alguien los copia a la carpeta del proyecto.
 datos.json
 datos.json.*

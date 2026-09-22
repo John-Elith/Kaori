@@ -13,6 +13,7 @@
 import type { Parte } from '../docx/mapaTexto';
 import { decodificarXml, codificarXml } from '../docx/xml';
 import type { Contrato, Cuota, Obligacion, Planilla } from '../modelo/tipos';
+import { aTerceraPersona } from '../extraccion/redactarActividades';
 import {
   comparar,
   desdeISO,
@@ -289,11 +290,13 @@ function reescribirTabla(
   obligaciones: Obligacion[],
   avisos: string[],
   etiqueta: string,
+  /** Cómo escribir cada actividad en esta tabla. */
+  redactar: (actividad: string) => string = (a) => a,
 ): string {
   return reescribirFilas(
     tablaXml,
     (t) => t.includes('OBLIGACIONES') && t.includes('ACTIVIDADES'),
-    obligaciones.map((o, i) => [`${o.n ?? i + 1}.`, o.texto, o.actividad ?? '']),
+    obligaciones.map((o, i) => [`${o.n ?? i + 1}.`, o.texto, redactar(o.actividad ?? '')]),
     avisos,
     etiqueta,
     3,
@@ -338,7 +341,15 @@ export function llenarTablaObligaciones(
           : 'tabla de obligaciones del informe de supervisión';
 
       const t = objetivo[i];
-      const reescrita = reescribirTabla(t.xml, obligaciones, avisos, etiqueta);
+      // En la del supervisor —DETALLE DE LA EJECUCIÓN— se cuenta lo que hizo
+      // el contratista: «Apoyó…», no «Se apoyó…».
+      const reescrita = reescribirTabla(
+        t.xml,
+        obligaciones,
+        avisos,
+        etiqueta,
+        posicion === 0 ? undefined : aTerceraPersona,
+      );
       xml = xml.slice(0, t.inicio) + reescrita + xml.slice(t.fin);
     }
 
@@ -745,14 +756,19 @@ function esTablaDePlanilla(tablaXml: string): boolean {
  *   acababa donde iba el día.
  *
  * Escribiendo por posición, la fila queda entera y coherente en los dos casos.
+ *
+ * Sin planilla, el número y la fecha quedan en blanco para escribirlos a mano,
+ * pero **el mes de pago sí se pone**: es el del informe, se sabe de antemano y
+ * así el documento sale al menos con eso.
  */
 export function llenarTablaPlanilla(
   partes: Parte[],
   planilla?: Planilla,
+  /** Mes del informe (1–12): va en MES DE PAGO cuando no hay planilla. */
+  mesDelInforme?: number,
 ): ResultadoTablas {
   const avisos: string[] = [];
 
-  // Sin planilla, las cinco casillas van vacías. Con ella, cada dato en su sitio.
   let celdas: string[];
   if (planilla) {
     const f = desdeISO(planilla.fecha);
@@ -764,7 +780,7 @@ export function llenarTablaPlanilla(
       planilla.mesAcreditado,
     ];
   } else {
-    celdas = ['', '', '', '', ''];
+    celdas = ['', '', '', '', mesDelInforme ? nombreMes(mesDelInforme) : ''];
   }
 
   let encontradas = 0;

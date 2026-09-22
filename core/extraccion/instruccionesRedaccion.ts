@@ -74,6 +74,37 @@ export function instruccionesActividades(obligaciones: string[], impersonal: boo
 }
 
 /**
+ * Leer las OBLIGACIONES ESPECÍFICAS de la imagen o el PDF de un contrato.
+ *
+ * Es transcribir, no redactar: el texto tiene que quedar como en el contrato,
+ * porque se firma un informe que las cita. Sólo se admite corregir lo que el
+ * escaneo haya estropeado a la vista (una tilde, una palabra partida).
+ */
+export function instruccionesLeerObligaciones(): Instrucciones {
+  return {
+    esquema: ESQUEMA_OBLIGACIONES,
+    sistema:
+      'Lees contratos de prestación de servicios de entidades colombianas, escaneados o ' +
+      'fotografiados. Tu única tarea es TRANSCRIBIR las obligaciones específicas del ' +
+      'contratista.\n\n' +
+      'Reglas que no se rompen:\n' +
+      '- Están en la cláusula de «Actividades específicas» u «Obligaciones específicas» ' +
+      'del contratista, numeradas (1., 2., 3.…). Toma desde la 1 hasta la última antes de ' +
+      '«Parágrafo» o de la cláusula siguiente. Nada del objeto, de los parágrafos ni del ' +
+      'pie de página.\n' +
+      '- Una obligación por elemento, en el mismo orden y sin su número delante.\n' +
+      '- Copia el texto tal cual. Sólo corrige lo que el escaneo haya estropeado a la vista ' +
+      '(una tilde, una letra, una palabra partida al final de la línea). No resumas, no ' +
+      'reordenes, no completes ni inventes nada.\n' +
+      '- Si la lista sigue en otra página del documento, inclúyela entera.\n' +
+      '- Si no encuentras una lista numerada de obligaciones, devuelve la lista vacía.',
+    usuario:
+      'Transcribe las obligaciones específicas del contratista que aparecen numeradas en ' +
+      'este documento.',
+  };
+}
+
+/**
  * OBLIGACIONES ESPECÍFICAS a partir de una indicación: una o dos de ejemplo,
  * y la IA completa el resto en el mismo registro y sobre el mismo oficio.
  */
