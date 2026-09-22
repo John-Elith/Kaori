@@ -18,6 +18,7 @@ import {
 } from '../electron/remoto/acceso';
 import {
   canalPermitido,
+  conExtension,
   dentroDe,
   iniciarServidor,
   limpiarNombre,
@@ -165,6 +166,14 @@ describe('qué puede pedir el teléfono', () => {
     expect(dentroDe('C:\\Salida\\..\\Windows\\win.ini', ['C:\\Salida'])).toBe(false);
     expect(dentroDe('C:\\SalidaFalsa\\a.docx', ['C:\\Salida'])).toBe(false);
     expect(dentroDe('C:\\Salida', ['C:\\Salida'])).toBe(false);
+  });
+
+  it('una foto de la cámara sin extensión la recibe según su tipo', () => {
+    expect(conExtension('image', 'image/jpeg')).toBe('image.jpg');
+    expect(conExtension('1726012345', 'image/png')).toBe('1726012345.png');
+    expect(conExtension('contrato.jpeg', 'image/jpeg')).toBe('contrato.jpeg');
+    expect(conExtension('contrato.pdf', 'application/pdf')).toBe('contrato.pdf');
+    expect(conExtension('raro', '')).toBe('raro');
   });
 
   it('los nombres subidos no traen rutas', () => {

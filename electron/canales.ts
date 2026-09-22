@@ -34,6 +34,7 @@ const manejadores = new Map<string, Manejador>();
  */
 const CANALES_QUE_CAMBIAN = new Set([
   'datos:escribir',
+  'datos:escribirSi',
   'plantillas:registrar',
   'plantillas:guardarMapa',
   'plantillas:cambiarTipo',

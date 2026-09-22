@@ -105,6 +105,17 @@ function registrarCanalesDatos(): void {
     return { ok: true as const };
   });
 
+  // Con versión: lo que usan las pantallas para no pisarse entre sí.
+  manejar('datos:leerConRevision', async () => ({
+    base: sinSecretos(await almacen.leer()),
+    revision: almacen.revisionActual(),
+  }));
+
+  manejar('datos:escribirSi', async (_e, datos: BaseDeDatos, revision: number) => {
+    const r = await almacen.escribirSi(conSecretosDe(datos, await almacen.leer()), revision);
+    return r.ok ? r : { ...r, base: sinSecretos(r.base) };
+  });
+
   manejar('datos:nuevoId', (_e, prefijo: string) => almacen.nuevoId(prefijo));
 
   manejar('datos:rutaArchivo', () => almacen.rutaDeDatos());

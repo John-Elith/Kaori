@@ -141,8 +141,40 @@ export async function leer(): Promise<BaseDeDatos> {
   }
 }
 
+/**
+ * Versión de la base: sube con cada guardado. Las pantallas la usan para no
+ * pisarse (ver core/modelo/sincronizacion.ts).
+ *
+ * Empieza en la hora de arranque, no en cero: así, tras reiniciar Kaori, la
+ * versión es siempre mayor que cualquiera que tuviera un teléfono conectado
+ * de antes, y el teléfono acepta los datos nuevos en vez de tomarlos por
+ * viejos.
+ */
+let revision = Date.now() * 1000;
+
+export function revisionActual(): number {
+  return revision;
+}
+
+/**
+ * Guarda sólo si la pantalla hizo su cambio sobre la versión actual. Si no,
+ * devuelve la versión actual para que la pantalla reaplique su cambio encima.
+ */
+export async function escribirSi(
+  datos: BaseDeDatos,
+  revisionEsperada: number,
+): Promise<{ ok: true; revision: number } | { ok: false; revision: number; base: BaseDeDatos }> {
+  const actual = await leer();
+  if (revisionEsperada !== revision) {
+    return { ok: false, revision, base: actual };
+  }
+  await escribir(datos);
+  return { ok: true, revision };
+}
+
 export function escribir(datos: BaseDeDatos): Promise<void> {
   cache = datos;
+  revision += 1;
   // El contenido se serializa aquí, no dentro de la cola, para capturar el
   // estado exacto de esta llamada aunque después lleguen otras.
   return escribirEnCola(rutaDeDatos(), JSON.stringify(datos, null, 2));

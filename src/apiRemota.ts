@@ -125,6 +125,9 @@ function elegirYSubir(filtros: { name: string; extensions: string[] }[]): Promis
           headers: {
             'Content-Type': 'application/octet-stream',
             'X-Nombre': encodeURIComponent(archivo.name),
+            // Algunas cámaras entregan la foto sin «.jpg» en el nombre; con el
+            // tipo, el PC sabe qué es.
+            'X-Tipo': archivo.type,
           },
           body: archivo,
         });
@@ -165,6 +168,8 @@ export function crearApiRemota(): Api {
       leer: canal('datos:leer'),
       escribir: canal('datos:escribir'),
       nuevoId: canal('datos:nuevoId'),
+      leerConRevision: canal('datos:leerConRevision'),
+      escribirSi: canal('datos:escribirSi'),
       rutaArchivo: canal('datos:rutaArchivo'),
     },
     sistema: {

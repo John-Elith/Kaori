@@ -11,6 +11,7 @@
  */
 
 import { abrirDocx, guardarDocx } from '../docx/leerDocx';
+import { sinHojasEnBlanco } from '../docx/paginacion';
 import { aplicarReemplazos, construirMapa } from '../docx/mapaTexto';
 import {
   construirReemplazos,
@@ -115,7 +116,7 @@ export function generarCuentaDeCobro(opciones: {
   }
 
   return {
-    contenido: guardarDocx(doc, partes),
+    contenido: guardarDocx(doc, sinHojasEnBlanco(partes)),
     nombre: nombreArchivoCuenta(contrato, contratista, anio, mes),
     avisos,
   };
@@ -160,7 +161,7 @@ export function generarCertificado(opciones: {
   if (conLista.avisos.length > 0) avisos.push(...conLista.avisos);
 
   return {
-    contenido: guardarDocx(doc, conLista.partes),
+    contenido: guardarDocx(doc, sinHojasEnBlanco(conLista.partes)),
     nombre: nombreArchivoCertificado(
       contrato,
       contratista,

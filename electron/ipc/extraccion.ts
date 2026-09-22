@@ -71,6 +71,9 @@ async function prepararImagen(ruta: string, ancho = 2400): Promise<Buffer | stri
     const sharp: Sharp =
       (modulo as unknown as { default?: Sharp }).default ?? (modulo as unknown as Sharp);
     return await sharp(ruta)
+      // Las fotos del teléfono vienen «acostadas» y con una marca de cómo
+      // girarlas; sin enderezarlas, el OCR las lee de lado y no encuentra nada.
+      .rotate()
       .resize({ width: ancho })
       .grayscale()
       .normalize()
@@ -80,6 +83,34 @@ async function prepararImagen(ruta: string, ancho = 2400): Promise<Buffer | stri
   } catch {
     // Sin sharp, o con un formato que no entiende: se lee tal cual.
     return ruta;
+  }
+}
+
+/**
+ * Una foto lista para mandarla a la IA: derecha y de un tamaño razonable.
+ *
+ * Las fotos hechas con la cámara del teléfono pesan de 4 a 12 MB y vienen
+ * acostadas, con una marca de cómo girarlas. Enviadas tal cual rozaban el
+ * límite de lo que acepta Gemini por petición y tardaban en subir. A 2400 px
+ * por el lado largo se sigue leyendo cada letra y pesan menos de 1 MB.
+ * Un PDF, o lo que sharp no sepa abrir, se manda como está.
+ */
+async function fotoParaIA(ruta: string, ext: string): Promise<{ datos: Buffer; ext: string }> {
+  const original = await fs.readFile(ruta);
+  if (!tipoImagen(ext)) return { datos: original, ext };
+  try {
+    const modulo = await import('sharp');
+    type Sharp = typeof modulo.default;
+    const sharp: Sharp =
+      (modulo as unknown as { default?: Sharp }).default ?? (modulo as unknown as Sharp);
+    const datos = await sharp(original)
+      .rotate()
+      .resize({ width: 2400, height: 2400, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 88 })
+      .toBuffer();
+    return { datos, ext: '.jpg' };
+  } catch {
+    return { datos: original, ext };
   }
 }
 
@@ -334,7 +365,8 @@ export function registrarCanalesExtraccion(
     if (redactor) {
       const nombre = NOMBRE_PROVEEDOR[redactor.proveedor];
       try {
-        const obligaciones = await leerObligaciones(redactor, await fs.readFile(ruta), ext);
+        const foto = await fotoParaIA(ruta, ext);
+        const obligaciones = await leerObligaciones(redactor, foto.datos, foto.ext);
         if (obligaciones.length > 0) {
           return { ok: true as const, obligaciones, motor: 'ia' as const, proveedor: nombre };
         }

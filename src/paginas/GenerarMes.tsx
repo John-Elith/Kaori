@@ -202,6 +202,12 @@ export function PaginaGenerarMes() {
     new Set(),
   );
   const claveMes = (m: number) => `${anio}-${m}`;
+  /** Contrato por el que se filtra la tabla; vacío, todos. */
+  const [filtroContrato, setFiltroContrato] = useRecordado<string>(
+    'generar.filtroContrato',
+    '',
+    (v): v is string => typeof v === 'string',
+  );
   const [calculando, setCalculando] = useState(false);
   /** Casilla cuyo formulario de planilla está abierto, si alguno. */
   const [editandoPlanilla, setEditandoPlanilla] = useState<string | null>(null);
@@ -434,6 +440,7 @@ export function PaginaGenerarMes() {
 
     setMeses(new Set(suyos));
     setSeleccion(new Set(suyos.map((m) => clave(m, contratoId))));
+    setFiltroContrato(contratoId);
 
     const otros = anios.filter((a) => a !== destino);
     setAvisoSoloUno(
@@ -459,7 +466,11 @@ export function PaginaGenerarMes() {
   if (!base) return <Cargando />;
 
   const carpeta = base.ajustes.carpetaSalida;
-  const elegibles = filas.filter((f) => tiposGenerables(f, tipos).length > 0);
+  // Con un contrato elegido en el filtro de la tabla, se ve, se cuenta y se
+  // genera sólo lo suyo: generar filas marcadas que no se ven confundiría.
+  const filtroVigente = contratosActivos.some((c) => c.id === filtroContrato) ? filtroContrato : '';
+  const filasVisibles = filtroVigente ? filas.filter((f) => f.contratoId === filtroVigente) : filas;
+  const elegibles = filasVisibles.filter((f) => tiposGenerables(f, tipos).length > 0);
   const seleccionados = [...seleccion].filter((k) =>
     elegibles.some((f) => clave(f.mes, f.contratoId) === k),
   );
@@ -481,7 +492,7 @@ export function PaginaGenerarMes() {
     ...new Set(
       [
         ...new Set(
-          filas
+          filasVisibles
             .filter((f) => seleccion.has(clave(f.mes, f.contratoId)))
             .map((f) => f.contratoId),
         ),
@@ -661,7 +672,7 @@ export function PaginaGenerarMes() {
         tiposUsados.map((tipo) => ({
           mes,
           tipo,
-          ids: filas
+          ids: filasVisibles
             .filter((f) => f.mes === mes && seleccion.has(clave(mes, f.contratoId)))
             .filter((f) => bloqueoDeFila(f, [tipo]) === null)
             .map((f) => f.contratoId),
@@ -841,14 +852,14 @@ export function PaginaGenerarMes() {
             <div className="flex flex-wrap gap-2">
               {TIPOS_DOCUMENTO.filter((t) => t.id !== 'certificado').map((t) => {
                 const marcado = tiposAGenerar.has(t.id);
-                const listos = filas.filter(
+                const listos = filasVisibles.filter(
                   (f) =>
                     seleccion.has(clave(f.mes, f.contratoId)) &&
                     bloqueoDeFila(f, [t.id]) === null,
                 ).length;
                 // Cuántos podrían generarse si se marcaran, para poder decirlo
                 // cuando la selección está vacía porque otro documento falla.
-                const posibles = filas.filter((f) => bloqueoDeFila(f, [t.id]) === null).length;
+                const posibles = filasVisibles.filter((f) => bloqueoDeFila(f, [t.id]) === null).length;
 
                 return (
                   <div
@@ -1069,8 +1080,33 @@ export function PaginaGenerarMes() {
               {seleccionados.length} de {elegibles.length} informe(s) marcado(s) ·{' '}
               {listaDeMeses(mesesOrdenados)} de {anio}
             </h2>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
               {calculando && <span className="text-tinta-tenue">Calculando…</span>}
+              <label className="flex items-center gap-1.5">
+                <span className="font-medium text-tinta-tenue">Contrato</span>
+                <select
+                  className={`campo w-auto max-w-[16rem] py-1 text-xs ${filtroVigente ? 'border-naranja-400' : ''}`}
+                  value={filtroVigente}
+                  onChange={(e) => setFiltroContrato(e.target.value)}
+                  title="Ver y generar sólo lo de un contrato"
+                >
+                  <option value="">Todos</option>
+                  {contratosPorActividad.map(({ contrato: c, contratista }) => (
+                    <option key={c.id} value={c.id}>
+                      {c.numero || '(sin número)'} · {contratista}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {filtroVigente && (
+                <button
+                  type="button"
+                  className="text-naranja-700 underline underline-offset-2 hover:no-underline"
+                  onClick={() => setFiltroContrato('')}
+                >
+                  Quitar filtro
+                </button>
+              )}
               {mesesOrdenados.length > 0 && (
                 <>
                   <button
@@ -1137,7 +1173,7 @@ export function PaginaGenerarMes() {
                 </thead>
                 <tbody>
                   {mesesOrdenados.map((mes) => {
-                    const delMes = filas.filter((f) => f.mes === mes);
+                    const delMes = filasVisibles.filter((f) => f.mes === mes);
                     const elegiblesDelMes = delMes.filter((f) => tiposGenerables(f, tipos).length > 0);
                     const marcadosDelMes = elegiblesDelMes.filter((f) =>
                       seleccion.has(clave(mes, f.contratoId)),
@@ -1183,7 +1219,7 @@ export function PaginaGenerarMes() {
                           setEditandoPlanilla(null);
                         }}
                         alCerrarPlanilla={() => setEditandoPlanilla(null)}
-                        abierto={mesesAbiertos.has(claveMes(mes))}
+                        abierto={filtroVigente !== '' || mesesAbiertos.has(claveMes(mes))}
                         alAlternar={() =>
                           setMesesAbiertos((s) => {
                             const n = new Set(s);

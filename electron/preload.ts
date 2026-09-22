@@ -71,6 +71,16 @@ const api = {
       ipcRenderer.invoke('datos:escribir', d),
     nuevoId: (prefijo: string): Promise<string> =>
       ipcRenderer.invoke('datos:nuevoId', prefijo),
+    /** La base con su número de versión (ver core/modelo/sincronizacion.ts). */
+    leerConRevision: (): Promise<{ base: BaseDeDatos; revision: number }> =>
+      ipcRenderer.invoke('datos:leerConRevision'),
+    /** Guarda sólo si se hizo sobre esa versión; si no, devuelve la actual. */
+    escribirSi: (
+      d: BaseDeDatos,
+      revision: number,
+    ): Promise<
+      { ok: true; revision: number } | { ok: false; revision: number; base: BaseDeDatos }
+    > => ipcRenderer.invoke('datos:escribirSi', d, revision),
     rutaArchivo: (): Promise<string> => ipcRenderer.invoke('datos:rutaArchivo'),
   },
 

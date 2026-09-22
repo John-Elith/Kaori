@@ -275,7 +275,10 @@ export async function iniciarServidor(
     }
 
     if (ruta === '/api/subir' && req.method === 'POST') {
-      const nombre = limpiarNombre(decodeURIComponent(String(req.headers['x-nombre'] ?? 'archivo')));
+      const nombre = conExtension(
+        limpiarNombre(decodeURIComponent(String(req.headers['x-nombre'] ?? 'archivo'))),
+        String(req.headers['x-tipo'] ?? ''),
+      );
       const datos = await leerCuerpo(req, LIMITE_SUBIDA);
       await fs.mkdir(op.carpetaSubidas, { recursive: true });
       const destino = join(op.carpetaSubidas, `${randomBytes(4).toString('hex')}-${nombre}`);
@@ -418,6 +421,30 @@ async function leerJson(req: IncomingMessage, limite: number): Promise<unknown> 
   }
   const datos = await leerCuerpo(req, limite);
   return JSON.parse(datos.toString('utf8') || 'null');
+}
+
+const EXTENSION_DE_TIPO: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+  'application/pdf': '.pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+};
+
+/**
+ * El nombre con la extensión que corresponde a su tipo, si no la traía.
+ *
+ * Una foto hecha en el momento con la cámara del teléfono llega a veces como
+ * «image» o «1726012345», sin «.jpg», y entonces Kaori no sabía qué era y la
+ * rechazaba.
+ */
+export function conExtension(nombre: string, tipo: string): string {
+  const ext = EXTENSION_DE_TIPO[tipo.toLowerCase().split(';')[0].trim()];
+  if (!ext) return nombre;
+  const actual = extname(nombre).toLowerCase();
+  if (actual === ext || (ext === '.jpg' && actual === '.jpeg')) return nombre;
+  return nombre + ext;
 }
 
 /** Nombre de archivo sin rutas ni caracteres que Windows no admite. */

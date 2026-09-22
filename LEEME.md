@@ -211,7 +211,19 @@ con ☰).
   del teclado del teléfono, que ya hace eso mismo.
 
 Si se trabaja a la vez en el PC y en el teléfono, cada uno ve al momento lo que
-guarda el otro.
+guarda el otro. Nada se pisa, ni siquiera en el mismo contrato: cada guardado
+lleva el número de versión que conoce, y si el otro guardó entre medias, Kaori
+toma lo suyo y vuelve a aplicar encima lo que se estaba escribiendo. Escribir
+rápido desde el teléfono con una conexión lenta tampoco pierde letras: los
+cambios salen en orden, uno detrás de otro, y si se cae la Wi-Fi se quedan
+esperando para el siguiente guardado.
+
+Una foto hecha con la cámara del teléfono sirve igual que una del PC para
+**Leer de una foto o PDF**: Kaori la endereza (las cámaras la guardan de lado y
+anotan cómo girarla), la reduce y reconoce el tipo aunque el móvil la mande sin
+extensión. Con Gemini saturado la lectura puede tardar un par de minutos,
+porque pasa al reconocimiento de texto del propio PC; mientras, el botón dice
+«Leyendo el contrato…».
 
 **Si el teléfono no abre la página:** compruebe que está en la misma Wi-Fi y no
 con datos móviles. Si el PC tiene varias conexiones, debajo del QR aparecen
@@ -242,6 +254,15 @@ Kaori marca los meses de ese contrato y, en cada uno, sólo a él: basta pulsar
 Generar. Si el contrato es de otro año, cambia al suyo. Si cruza de un año al
 siguiente, marca los del año que se ve y avisa de los demás. El último
 contrato trabajado sale el primero de la lista.
+
+## Filtrar la tabla por contrato
+
+En la cabecera de la tabla de meses, **Contrato** deja ver sólo un contrato.
+Con el filtro puesto, los meses se despliegan solos, y los contadores, los
+avisos de duplicados y el botón Generar cuentan sólo lo que se ve: nunca se
+genera una fila marcada que quedó oculta. **Quitar filtro** vuelve a mostrar
+todos. **Solo un contrato** pone también el filtro en ese contrato. El filtro
+se recuerda al volver a la pantalla; si el contrato se elimina, se quita solo.
 
 ## Cada mes, desplegable
 

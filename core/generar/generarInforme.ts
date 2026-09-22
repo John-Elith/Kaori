@@ -3,6 +3,7 @@
  */
 
 import { abrirDocx, guardarDocx } from '../docx/leerDocx';
+import { sinHojasEnBlanco } from '../docx/paginacion';
 import { construirMapa } from '../docx/mapaTexto';
 import { aplicarReemplazos } from '../docx/mapaTexto';
 import {
@@ -146,8 +147,12 @@ export function generarInforme(opciones: OpcionesGeneracion): ResultadoGeneracio
   // Dónde parte Word una página no se puede saber leyendo el XML: depende de
   // la altura real del texto ya compuesto. Lo único que se puede hacer bien es
   // respetar la plantilla, que ya está paginada como debe.
+  //
+  // Salvo en una cosa: los renglones vacíos de relleno que la plantilla deja
+  // antes de su salto de página. Si el informe crece, pasan a la hoja
+  // siguiente y el salto la deja en blanco. `sinHojasEnBlanco` los quita.
   return {
-    contenido: guardarDocx(doc, conPlanilla.partes),
+    contenido: guardarDocx(doc, sinHojasEnBlanco(conPlanilla.partes)),
     nombre: nombreArchivo(datos.contrato, datos.contratista, datos.anio, datos.mes),
     balance,
     avisos,
